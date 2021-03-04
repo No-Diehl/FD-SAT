@@ -11,6 +11,9 @@ endif()
 
 ## == Project ==
 
+# <@=*=@> Add the library path so cmake finds the library <@=*=@>
+link_directories("/home/norbert/Documents/Bachelor/cryptominisat-5.8.0/build/lib/")
+
 project(downward)
 fast_downward_set_compiler_flags()
 fast_downward_set_linker_flags()
@@ -34,6 +37,9 @@ endif()
 if(WIN32)
     target_link_libraries(downward psapi)
 endif()
+
+# <@=*=@> Include custom library with IPASIR interface, e.g. CryptoMiniSAT. <@=*=@>
+target_link_libraries(downward ipasircryptominisat5)
 
 # If any enabled plugin requires an LP solver, compile with all
 # available LP solvers. If no solvers are installed, the planner will
