@@ -16,33 +16,9 @@
 using namespace std;
 using utils::ExitCode;
 
-// <@=*=@> Function from Gregor to test IPASIR interface <@=*=@>
-void sat_solver_call(){
-     cout << ipasir_signature() << endl;
-     void* solver = ipasir_init();
-     ipasir_add(solver,-1);
-     ipasir_add(solver,-2);
-     ipasir_add(solver,0);
-
-     ipasir_add(solver,-3);
-     ipasir_add(solver,2);
-     ipasir_add(solver,0);
-
-     ipasir_add(solver,3);
-     ipasir_add(solver,0);
-
-     int state = ipasir_solve(solver);
-     cout << state << endl;
-     if (state == 10){
-         for (int v = 1; v <= 3; v++)
-             cout  << "V " << v << ": " << ipasir_val(solver,v) << endl;
-    }
-}
-// <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@>
-
 int main(int argc, const char **argv) {
-    // <@=*=@> sat_solver_call();
-    // <@=*=@> return(0);
+    // sat::sat_solver_call();
+    // return(0);
     utils::register_event_handlers();
 
     if (argc < 2) {
@@ -57,7 +33,7 @@ int main(int argc, const char **argv) {
         utils::g_log << "done reading input!" << endl;
         TaskProxy task_proxy(*tasks::g_root_task);
         unit_cost = task_properties::is_unit_cost(task_proxy);
-        sat_init(task_proxy);
+        sat::sat_init(task_proxy);
          
     }
 

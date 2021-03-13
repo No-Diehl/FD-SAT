@@ -2,10 +2,33 @@
 #include <iostream>
 
 using namespace std;
-        
-        
-        
-void sat_init (TaskProxy task_proxy) {
+
+namespace sat {
+// <@=*=@> Function from Gregor to test IPASIR interface <@=*=@>
+void sat_solver_call() {
+     cout << ipasir_signature() << endl;
+     void* solver = ipasir_init();
+     ipasir_add(solver,-1);
+     ipasir_add(solver,-2);
+     ipasir_add(solver,0);
+
+     ipasir_add(solver,-3);
+     ipasir_add(solver,2);
+     ipasir_add(solver,0);
+
+     ipasir_add(solver,3);
+     ipasir_add(solver,0);
+
+     int state = ipasir_solve(solver);
+     cout << state << endl;
+     if (state == 10){
+         for (int v = 1; v <= 3; v++)
+             cout  << "V " << v << ": " << ipasir_val(solver,v) << endl;
+    }
+}
+
+
+void sat_init(TaskProxy task_proxy) {
     // <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@
     //FactsProxyIterator fact_it = task_proxy.get_variables().get_facts().end();
     //cout << AbstractTask(task_proxy).get_variable_name(1) << endl;
@@ -73,4 +96,5 @@ void sat_init (TaskProxy task_proxy) {
     //FactsProxyIterator fpi_begin = task_proxy.get_variables().get_facts().begin();
     //FactsProxyIterator fpi_end = task_proxy.get_variables().get_facts().end();
     //AbstractTask abs_task(tasks::g_root_task); geht nicht wegen Funktionen
+}
 }

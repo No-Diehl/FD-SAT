@@ -80,7 +80,7 @@ fast_downward_plugin(
         task_id
         task_proxy
 
-    DEPENDS CAUSAL_GRAPH INT_HASH_SET INT_PACKER ORDERED_SET SEGMENTED_VECTOR SUBSCRIBER SUCCESSOR_GENERATOR TASK_PROPERTIES
+    DEPENDS CAUSAL_GRAPH INT_HASH_SET INT_PACKER ORDERED_SET SEGMENTED_VECTOR SUBSCRIBER SUCCESSOR_GENERATOR TASK_PROPERTIES SAT
     CORE_PLUGIN
 )
 
@@ -767,6 +767,14 @@ fast_downward_plugin(
          "directed graph."
     SOURCES
         algorithms/sccs
+    DEPENDENCY_ONLY
+)
+
+fast_downward_plugin(
+    NAME SAT
+    HELP "SAT encoding of SAS+ files to be solved by SAT-Solver."
+    SOURCES
+        sat/sat
     DEPENDENCY_ONLY
 )
 
