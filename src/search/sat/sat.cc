@@ -1,5 +1,6 @@
 #include "sat.h"
 #include <iostream>
+#include<unordered_map>
 
 using namespace std;
 
@@ -97,4 +98,32 @@ void sat_init(TaskProxy task_proxy) {
     //FactsProxyIterator fpi_end = task_proxy.get_variables().get_facts().end();
     //AbstractTask abs_task(tasks::g_root_task); geht nicht wegen Funktionen
 }
+
+void sat_encoding(TaskProxy task_proxy) {
+    
+	/* Store State and Action Variables in respective maps. The position of the variables
+	   inside the vector corresponds to the time step in which they are true (states)
+	   or can be executed (actions). */
+	unordered_map<string, vector<int>> statesAtTimepoints;
+	unordered_map<string, vector<int>> actionsAtTimepoints;
+	int numOfVariables = 0;
+	
+    for (int i=0; i<task_proxy.get_variables().size(); i++) {
+		for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
+			statesAtTimepoints[task_proxy.get_variables()[i].get_fact(j).get_name()].push_back(++numOfVariables);
+		}
+	}
+	/*for (auto & map : statesAtTimepoints) {
+		cout << map.first << " has values " << map.second << endl;
+	}*/
+
+	for (OperatorProxy const & operators : task_proxy.get_operators()) {
+		actionsAtTimepoints[operators.get_name()].push_back(++numOfVariables);
+	}
+
+	/*for (auto & map : actionsAtTimepoints) {
+		cout << map.first << " has values " << map.second << endl;
+	}*/
+}
+
 }
