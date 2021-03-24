@@ -36,7 +36,7 @@ int main(int argc, const char **argv) {
         unit_cost = task_properties::is_unit_cost(task_proxy);
         sat_capsule capsule;
         sat::sat_init(task_proxy, capsule);
-        // sat::sat_encoding(task_proxy, capsule);
+        sat::sat_encoding(task_proxy, capsule);
          
     }
 

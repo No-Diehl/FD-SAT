@@ -1,6 +1,6 @@
 #include "sat.h"
 #include <iostream>
-#include<unordered_map>
+#include <unordered_map>
 
 using namespace std;
 
@@ -44,6 +44,7 @@ vector<vector<int>> factsAtTplusOne;
 */
 vector<vector<int>> operatorVars;
 
+int timeStep = 0;
 
 void sat_init(TaskProxy task_proxy, sat_capsule & capsule) {
     // Initially fill the corresponding vectors with the variables representing
@@ -138,8 +139,33 @@ void sat_init(TaskProxy task_proxy, sat_capsule & capsule) {
     AbstractTask abs_task(tasks::g_root_task); geht nicht wegen Funktionen */
 }
 
-void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
+void* solver = ipasir_init();
 
+void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
+    // Add the variables reflecting the goal state of the problem.
+    for (size_t i=0; i<task_proxy.get_goals().size(); i++) {
+        assertYes(solver, factsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value]);
+    }
+    // Add the variables reflecting the initial state of the problem.
+    for (size_t i=0; i<task_proxy.get_initial_state().size(); i++) {
+        assertYes(solver, factsAtTnow[i][task_proxy.get_initial_state().get_values()[i]]);
+    }
+    // Add the variables reflecting the operators at the current time step.
+    for (OperatorProxy const & operators : task_proxy.get_operators()) {
+        int operatorVar = operatorVars[timeStep][operators.get_id()];
+        set<int> pre;
+        for (FactProxy const & preconditions : operators.get_preconditions()) {
+            pre.insert(factsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value]);
+            implies(solver, operatorVar, factsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value]);
+        }
+        for (EffectProxy const & effects : operators.get_effects()) {
+            int effectVar = factsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_pair().value];
+            andImplies(solver, pre, effectVar);
+        }
+    }
+    atLeastOne(solver, capsule, operatorVars[timeStep]);
+    atMostOne(solver, capsule, operatorVars[timeStep]);
+    cout << ipasir_solve(solver) << endl;
 }
 
 }
