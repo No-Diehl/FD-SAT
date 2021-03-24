@@ -3,6 +3,7 @@
 #include "option_parser.h"
 #include "search_engine.h"
 #include "sat/sat.h"
+#include "sat_encoder.h"
 
 #include "options/registries.h"
 #include "tasks/root_task.h"
@@ -33,8 +34,9 @@ int main(int argc, const char **argv) {
         utils::g_log << "done reading input!" << endl;
         TaskProxy task_proxy(*tasks::g_root_task);
         unit_cost = task_properties::is_unit_cost(task_proxy);
-        // sat::sat_init(task_proxy);
-        sat::sat_encoding(task_proxy);
+        sat::sat_init(task_proxy);
+        sat_capsule capsule;
+        sat::sat_encoding(task_proxy, capsule);
          
     }
 

@@ -80,7 +80,7 @@ fast_downward_plugin(
         task_id
         task_proxy
 
-    DEPENDS CAUSAL_GRAPH INT_HASH_SET INT_PACKER ORDERED_SET SEGMENTED_VECTOR SUBSCRIBER SUCCESSOR_GENERATOR TASK_PROPERTIES SAT
+    DEPENDS CAUSAL_GRAPH INT_HASH_SET INT_PACKER ORDERED_SET SEGMENTED_VECTOR SUBSCRIBER SUCCESSOR_GENERATOR TASK_PROPERTIES SAT SAT_ENCODER
     CORE_PLUGIN
 )
 
@@ -775,6 +775,14 @@ fast_downward_plugin(
     HELP "SAT encoding of SAS+ files to be solved by SAT-Solver."
     SOURCES
         sat/sat
+    DEPENDENCY_ONLY
+)
+
+fast_downward_plugin(
+    NAME SAT_ENCODER
+    HELP "SAT encoding helper file feeding variables into IPASIR and keeping count of variables."
+    SOURCES
+        sat_encoder
     DEPENDENCY_ONLY
 )
 

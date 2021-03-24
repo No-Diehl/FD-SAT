@@ -47,7 +47,8 @@ void sat_init(TaskProxy task_proxy) {
 	for (int i=0; i<21; i++) {
 	    cout << "Variable " << task_proxy.get_variables()[i].get_name() << ": Has " << task_proxy.get_variables()[i].get_domain_size() << " items." << endl;
 		for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
-			cout << "Item " << j << " is: " << task_proxy.get_variables()[i].get_fact(j).get_name() << endl;
+			cout << "Item " << j << " is: " << task_proxy.get_variables()[i].get_fact(j).get_name() <<
+				" coded as " << task_proxy.get_variables()[i].get_fact(j).get_pair() << endl;
 		}
 	}
 	cout << "There are " << task_proxy.get_operators().size() << " operators." << endl;
@@ -99,14 +100,28 @@ void sat_init(TaskProxy task_proxy) {
     //AbstractTask abs_task(tasks::g_root_task); geht nicht wegen Funktionen
 }
 
-void sat_encoding(TaskProxy task_proxy) {
+void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
     
-	/* Store State and Action Variables in respective maps. The position of the variables
-	   inside the vector corresponds to the time step in which they are true (states)
-	   or can be executed (actions). */
-	unordered_map<string, vector<int>> statesAtTimepoints;
-	unordered_map<string, vector<int>> actionsAtTimepoints;
-	int numOfVariables = 0;
+    /* Store State and Action Variables in respective maps. The position of the variables
+       inside the vector corresponds to the time step in which they are true (states)
+       or can be executed (actions). */
+    unordered_map<string, vector<int>> statesAtTimepoints;
+    unordered_map<string, vector<int>> actionsAtTimepoints;
+    int numOfVariables = 0;
+
+    vector<vector<int>> atomsAtTnow;
+    vector<vector<int>> atomsAtTplusOne;
+    for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
+        vector<int> mutexGroupNow;
+        vector<int> mutexGroupPlusOne;
+        for (size_t j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
+            mutexGroupNow.push_back(capsule.new_variable());
+            mutexGroupPlusOne.push_back(capsule.new_variable());
+        }
+        atomsAtTnow.push_back(mutexGroupNow);
+        atomsAtTplusOne.push_back(mutexGroupPlusOne);
+    }
+
 	
     for (int i=0; i<task_proxy.get_variables().size(); i++) {
 		for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
