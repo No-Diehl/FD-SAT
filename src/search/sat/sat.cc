@@ -7,33 +7,33 @@ using namespace std;
 namespace sat {
 // <@=*=@> Function from Gregor to test IPASIR interface <@=*=@>
 void sat_solver_call() {
-     cout << ipasir_signature() << endl;
-     void* solver = ipasir_init();
-     ipasir_add(solver,-1);
-     ipasir_add(solver,-2);
-     ipasir_add(solver,0);
+    cout << ipasir_signature() << endl;
+    void* solver = ipasir_init();
+    ipasir_add(solver,-1);
+    ipasir_add(solver,-2);
+    ipasir_add(solver,0);
 
-     ipasir_add(solver,-3);
-     ipasir_add(solver,2);
-     ipasir_add(solver,0);
+    ipasir_add(solver,-3);
+    ipasir_add(solver,2);
+    ipasir_add(solver,0);
 
-     ipasir_add(solver,3);
-     ipasir_add(solver,0);
+    ipasir_add(solver,3);
+    ipasir_add(solver,0);
 
-     int state = ipasir_solve(solver);
-     cout << state << endl;
-     if (state == 10){
-         for (int v = 1; v <= 3; v++)
-             cout  << "V " << v << ": " << ipasir_val(solver,v) << endl;
+    int state = ipasir_solve(solver);
+    cout << state << endl;
+    if (state == 10){
+        for (int v = 1; v <= 3; v++)
+            cout  << "V " << v << ": " << ipasir_val(solver,v) << endl;
     }
 }
 
 /* Using two 2D vectors to store the state variables (facts) for the current and
        following time step.
-       TODO: Use pointers to indicate which vector represents the current/following
+       TODO: Find a way to indicate which vector represents the current/following
        state variables. It will alternate each timestep, since t+1 will become t in
        the following iteration. And the contents of the former current state will be
-       replaced with the variables for the following time step.
+       replaced with the variables for the following time step. Pointers? Bool flag?
 */
 vector<vector<int>> factsAtTnow;
 vector<vector<int>> factsAtTplusOne;
@@ -150,7 +150,12 @@ void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
     for (size_t i=0; i<task_proxy.get_initial_state().size(); i++) {
         assertYes(solver, factsAtTnow[i][task_proxy.get_initial_state().get_values()[i]]);
     }
-    // Add the variables reflecting the operators at the current time step.
+    // Add clauses reflecting the mutex condition of a group of variables.
+    for (size_t i=0; i<factsAtTplusOne.size(); i++) {
+        atLeastOne(solver, capsule, factsAtTplusOne[i]);
+        atMostOne(solver, capsule, factsAtTplusOne[i]);
+    }
+    // Add clauses reflecting the operators at the current time step.
     for (OperatorProxy const & operators : task_proxy.get_operators()) {
         int operatorVar = operatorVars[timeStep][operators.get_id()];
         set<int> pre;
@@ -163,9 +168,18 @@ void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
             andImplies(solver, pre, effectVar);
         }
     }
+    // Add clauses such that exactly one operator can be picked per time step.
     atLeastOne(solver, capsule, operatorVars[timeStep]);
     atMostOne(solver, capsule, operatorVars[timeStep]);
+    cout << "That many clauses have been added: " << get_number_of_clauses() << endl;
     cout << ipasir_solve(solver) << endl;
+    /*int clause = capsule.number_of_variables;
+    if (ipasir_solve(solver) == 10){
+        for (int v = 1; v <= clause; v++)
+            for (int i=0; i<operatorVars[timeStep].size(); i++) {
+                if (operatorVars[timeStep][i] == v) cout  << "V " << v << ": " << ipasir_val(solver,v) << endl;
+            }
+    }*/
 }
 
 }
