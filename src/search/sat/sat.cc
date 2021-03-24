@@ -102,15 +102,22 @@ void sat_init(TaskProxy task_proxy) {
 
 void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
     
-    /* Store State and Action Variables in respective maps. The position of the variables
-       inside the vector corresponds to the time step in which they are true (states)
-       or can be executed (actions). */
+    /* Store State (facts) and Action Variables in respective 2D vectors. The position of
+       the variables inside the vector corresponds to the time step in which they are true
+       (states) or can be executed (actions). */
     unordered_map<string, vector<int>> statesAtTimepoints;
     unordered_map<string, vector<int>> actionsAtTimepoints;
     int numOfVariables = 0;
 
-    vector<vector<int>> atomsAtTnow;
-    vector<vector<int>> atomsAtTplusOne;
+    /* Using two 2D vectors to store the state variables (facts) for the current and
+       following time step.
+       TODO: Use pointers to indicate which vector represents the current/following
+       state variables. It will alternate each timestep, since t+1 will become t in
+       the following iteration. And the contents of the former current state will be
+       replaced with the variables for the following time step.
+    */
+    vector<vector<int>> factsAtTnow;
+    vector<vector<int>> factsAtTplusOne;
     for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
         vector<int> mutexGroupNow;
         vector<int> mutexGroupPlusOne;
@@ -118,10 +125,21 @@ void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
             mutexGroupNow.push_back(capsule.new_variable());
             mutexGroupPlusOne.push_back(capsule.new_variable());
         }
-        atomsAtTnow.push_back(mutexGroupNow);
-        atomsAtTplusOne.push_back(mutexGroupPlusOne);
+        factsAtTnow.push_back(mutexGroupNow);
+        factsAtTplusOne.push_back(mutexGroupPlusOne);
     }
 
+    /* Using a 2D vector to store the operator variables for each time step.
+       Each vector represents the time step at which an operator was executed
+       (if true in the returned plan).
+    */
+	vector<vector<int>> operatorVars;
+    vector<int> operatorsAtTnow;
+    for (OperatorProxy const & operators : task_proxy.get_operators()) {
+        operatorsAtTnow.push_back(capsule.new_variable());
+    }
+    operatorVars.push_back(operatorsAtTnow);
+    operatorsAtTnow.clear();
 	
     for (int i=0; i<task_proxy.get_variables().size(); i++) {
 		for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
