@@ -52,7 +52,7 @@ void sat_init(TaskProxy task_proxy, sat_capsule & capsule) {
     for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
         vector<int> mutexGroupNow;
         vector<int> mutexGroupPlusOne;
-        for (size_t j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
+        for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
             mutexGroupNow.push_back(capsule.new_variable());
             mutexGroupPlusOne.push_back(capsule.new_variable());
         }
@@ -63,11 +63,10 @@ void sat_init(TaskProxy task_proxy, sat_capsule & capsule) {
     // Initially fill the vector with the variables representing which operator
     // was executed (if true in the returned plan) at t0.
     vector<int> operatorsAtTnow;
-    for (OperatorProxy const & operators : task_proxy.get_operators()) {
+    for (size_t i=0; i<task_proxy.get_operators().size(); i++) {
         operatorsAtTnow.push_back(capsule.new_variable());
     }
     operatorVars.push_back(operatorsAtTnow);
-    // operatorsAtTnow.clear();
 
     /* <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@
     FactsProxyIterator fact_it = task_proxy.get_variables().get_facts().end();
@@ -147,12 +146,12 @@ void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
         assertYes(solver, factsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value]);
     }
     // Add the variables reflecting the initial state of the problem.
-    for (size_t a=0; a<factsAtTnow.size(); a++) {
-        for (size_t b=0; b<factsAtTnow[a].size(); b++) {
-            if (task_proxy.get_initial_state().get_values()[a] == b) {
-                assertYes(solver, factsAtTnow[a][b]);
+    for (size_t i=0; i<factsAtTnow.size(); i++) {
+        for (size_t j=0; j<factsAtTnow[i].size(); j++) {
+            if (task_proxy.get_initial_state().get_values()[i] == j) {
+                assertYes(solver, factsAtTnow[i][j]);
             } else {
-                assertNot(solver, factsAtTnow[a][b]);
+                assertNot(solver, factsAtTnow[i][j]);
             }
         }
     }
@@ -164,14 +163,12 @@ void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
     // Add clauses reflecting the operators at the current time step.
     for (OperatorProxy const & operators : task_proxy.get_operators()) {
         int operatorVar = operatorVars[timeStep][operators.get_id()];
-        set<int> pre;
         for (FactProxy const & preconditions : operators.get_preconditions()) {
-            pre.insert(factsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value]);
             implies(solver, operatorVar, factsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value]);
         }
         for (EffectProxy const & effects : operators.get_effects()) {
             int effectVar = factsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_pair().value];
-            andImplies(solver, pre, effectVar);
+            implies(solver, operatorVar, effectVar);
         }
     }
     // Add clauses such that exactly one operator can be picked per time step.
