@@ -147,8 +147,16 @@ void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
         assertYes(solver, factsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value]);
     }
     // Add the variables reflecting the initial state of the problem.
-    for (size_t i=0; i<task_proxy.get_initial_state().size(); i++) {
-        assertYes(solver, factsAtTnow[i][task_proxy.get_initial_state().get_values()[i]]);
+    for (size_t a=0; a<factsAtTnow.size(); a++) {
+        for (size_t b=0; b<factsAtTnow[a].size(); b++) {
+            if (task_proxy.get_initial_state().get_values()[a] == b) {
+                assertYes(solver, factsAtTnow[a][b]);
+                cout << "Asserted true, variable: " << factsAtTnow[a][b] << endl;
+            } else {
+                assertNot(solver, factsAtTnow[a][b]);
+                 cout << "Asserted false, variable: " << factsAtTnow[a][b] << endl;
+            }
+        }
     }
     // Add clauses reflecting the mutex condition of a group of variables.
     for (size_t i=0; i<factsAtTplusOne.size(); i++) {
