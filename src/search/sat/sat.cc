@@ -151,10 +151,8 @@ void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
         for (size_t b=0; b<factsAtTnow[a].size(); b++) {
             if (task_proxy.get_initial_state().get_values()[a] == b) {
                 assertYes(solver, factsAtTnow[a][b]);
-                cout << "Asserted true, variable: " << factsAtTnow[a][b] << endl;
             } else {
                 assertNot(solver, factsAtTnow[a][b]);
-                 cout << "Asserted false, variable: " << factsAtTnow[a][b] << endl;
             }
         }
     }
