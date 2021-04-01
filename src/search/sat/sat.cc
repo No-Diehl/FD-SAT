@@ -44,7 +44,9 @@ vector<vector<int>> factsAtTplusOne;
 */
 vector<vector<int>> operatorVars;
 
-int timeStep = 0;
+// int timeStep = 0;
+
+void* solver = ipasir_init();
 
 void sat_init(TaskProxy task_proxy, sat_capsule & capsule) {
     // Initially fill the corresponding vectors with the variables representing
@@ -138,13 +140,28 @@ void sat_init(TaskProxy task_proxy, sat_capsule & capsule) {
     AbstractTask abs_task(tasks::g_root_task); geht nicht wegen Funktionen */
 }
 
-void* solver = ipasir_init();
-
-void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
-    // Add the variables reflecting the goal state of the problem.
-    for (size_t i=0; i<task_proxy.get_goals().size(); i++) {
-        assertYes(solver, factsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value]);
+void sat_step(TaskProxy task_proxy, sat_capsule & capsule) {
+    factsAtTnow.swap(factsAtTplusOne);
+    // Replace all the variables in factsAtTplusOne with new variables for the current time step.
+    for (size_t i=0; i<factsAtTplusOne.size(); i++) {
+        for (size_t j=0; j<factsAtTplusOne[i].size(); j++) {
+            factsAtTplusOne[i][j] = capsule.new_variable();
+        }
     }
+
+    // Create a new vector<int> with variables representing which operator was executed
+    // (if true in the returned plan) at the current time step.
+    vector<int> operatorsAtTnow;
+    for (size_t i=0; i<task_proxy.get_operators().size(); i++) {
+        operatorsAtTnow.push_back(capsule.new_variable());
+    }
+    operatorVars.push_back(operatorsAtTnow);
+}
+
+void sat_encoding(TaskProxy task_proxy, int steps) {
+    sat_capsule capsule;
+    sat_init(task_proxy, capsule);
+
     // Add the variables reflecting the initial state of the problem.
     for (size_t i=0; i<factsAtTnow.size(); i++) {
         for (size_t j=0; j<factsAtTnow[i].size(); j++) {
@@ -155,45 +172,65 @@ void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
             }
         }
     }
-    // Add clauses reflecting the mutex condition of a group of variables.
-    for (size_t i=0; i<factsAtTplusOne.size(); i++) {
-        atLeastOne(solver, capsule, factsAtTplusOne[i]);
-        atMostOne(solver, capsule, factsAtTplusOne[i]);
-    }
-    // Vector to collect frame actions executing the same effects.
-    vector<vector<vector<int>>> frameAxioms;
-    for (int i=0; i<task_proxy.get_variables().size(); i++) {
-        vector<vector<int>> variable;
-        for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
-            vector<int> fact;
-            variable.push_back(fact);
+
+    for (int timeStep=0; timeStep<steps; timeStep++) {
+        // Add clauses reflecting the mutex condition of a group of variables.
+        for (size_t i=0; i<factsAtTplusOne.size(); i++) {
+            atLeastOne(solver, capsule, factsAtTplusOne[i]);
+            atMostOne(solver, capsule, factsAtTplusOne[i]);
         }
-    frameAxioms.push_back(variable);
-    }
-    // Add clauses reflecting the operators at the current time step.
-    for (OperatorProxy const & operators : task_proxy.get_operators()) {
-        int operatorVar = operatorVars[timeStep][operators.get_id()];
-        for (FactProxy const & preconditions : operators.get_preconditions()) {
-            implies(solver, operatorVar, factsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value]);
+
+        // Vector to collect frame actions executing the same effects.
+        vector<vector<vector<int>>> frameAxioms;
+        for (int i=0; i<task_proxy.get_variables().size(); i++) {
+            vector<vector<int>> variable;
+            for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
+                vector<int> fact;
+                variable.push_back(fact);
+            }
+        frameAxioms.push_back(variable);
         }
-        for (EffectProxy const & effects : operators.get_effects()) {
-            int effectVar = factsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_pair().value];
-            implies(solver, operatorVar, effectVar);
-            // Add frame axiom for the rising flank (neg state becomes pos state)
-            frameAxioms[effects.get_fact().get_pair().var][effects.get_fact().get_value()].push_back(operatorVars[timeStep][operators.get_id()]);
+
+        // Add clauses reflecting the operators at the current time step.
+        for (OperatorProxy const & operators : task_proxy.get_operators()) {
+            int operatorVar = operatorVars[timeStep][operators.get_id()];
+            for (FactProxy const & preconditions : operators.get_preconditions()) {
+                implies(solver, operatorVar, factsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value]);
+            }
+            for (EffectProxy const & effects : operators.get_effects()) {
+                int effectVar = factsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_pair().value];
+                implies(solver, operatorVar, effectVar);
+                // Add frame axiom for the rising flank (neg state becomes pos state)
+                frameAxioms[effects.get_fact().get_pair().var][effects.get_fact().get_value()].push_back(operatorVars[timeStep][operators.get_id()]);
+            }
+        }
+
+        // Add frame axiom clauses.
+        for (int i=0; i<frameAxioms.size(); i++) {
+            for (int j=0; j<frameAxioms[i].size(); j++) {
+                int neg = factsAtTnow[i][j];
+                int pos = factsAtTplusOne[i][j];
+                impliesPosAndNegImpliesOr(solver, neg, pos, frameAxioms[i][j]);
+            }
+        }
+
+        // Add clauses such that exactly one operator can be picked per time step.
+        atLeastOne(solver, capsule, operatorVars[timeStep]);
+        atMostOne(solver, capsule, operatorVars[timeStep]);
+
+        // At the end of one step prepare the next time step, if it isn't the last.
+        if (timeStep == steps-1) {
+            break;
+        } else {
+            sat_step(task_proxy, capsule);
         }
     }
-    // Add frame axiom clauses.
-    for (int i=0; i<frameAxioms.size(); i++) {
-        for (int j=0; j<frameAxioms[i].size(); j++) {
-            int neg = factsAtTnow[i][j];
-            int pos = factsAtTplusOne[i][j];
-            impliesPosAndNegImpliesOr(solver, neg, pos, frameAxioms[i][j]);
-        }
+
+    // Add the variables reflecting the goal state of the problem after the last time step.
+    for (size_t i=0; i<task_proxy.get_goals().size(); i++) {
+        assertYes(solver, factsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value]);
     }
-    // Add clauses such that exactly one operator can be picked per time step.
-    atLeastOne(solver, capsule, operatorVars[timeStep]);
-    atMostOne(solver, capsule, operatorVars[timeStep]);
+
     cout << "That many clauses have been added: " << get_number_of_clauses() << endl;
     cout << ipasir_solve(solver) << endl;
     /*int clause = capsule.number_of_variables;
