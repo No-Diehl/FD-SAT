@@ -160,6 +160,16 @@ void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
         atLeastOne(solver, capsule, factsAtTplusOne[i]);
         atMostOne(solver, capsule, factsAtTplusOne[i]);
     }
+    // Vector to collect frame actions executing the same effects.
+    vector<vector<vector<int>>> frameAxioms;
+    for (int i=0; i<task_proxy.get_variables().size(); i++) {
+        vector<vector<int>> variable;
+        for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
+            vector<int> fact;
+            variable.push_back(fact);
+        }
+    frameAxioms.push_back(variable);
+    }
     // Add clauses reflecting the operators at the current time step.
     for (OperatorProxy const & operators : task_proxy.get_operators()) {
         int operatorVar = operatorVars[timeStep][operators.get_id()];
@@ -169,6 +179,16 @@ void sat_encoding(TaskProxy task_proxy, sat_capsule & capsule) {
         for (EffectProxy const & effects : operators.get_effects()) {
             int effectVar = factsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_pair().value];
             implies(solver, operatorVar, effectVar);
+            // Add frame axiom for the rising flank (neg state becomes pos state)
+            frameAxioms[effects.get_fact().get_pair().var][effects.get_fact().get_value()].push_back(operatorVars[timeStep][operators.get_id()]);
+        }
+    }
+    // Add frame axiom clauses.
+    for (int i=0; i<frameAxioms.size(); i++) {
+        for (int j=0; j<frameAxioms[i].size(); j++) {
+            int neg = factsAtTnow[i][j];
+            int pos = factsAtTplusOne[i][j];
+            impliesPosAndNegImpliesOr(solver, neg, pos, frameAxioms[i][j]);
         }
     }
     // Add clauses such that exactly one operator can be picked per time step.
