@@ -210,7 +210,7 @@ void sat_encoding(TaskProxy task_proxy, int steps) {
             for (int j=0; j<frameAxioms[i].size(); j++) {
                 int neg = factsAtTnow[i][j];
                 int pos = factsAtTplusOne[i][j];
-                impliesPosAndNegImpliesOr(solver, neg, pos, frameAxioms[i][j]);
+                impliesPosAndNegImpliesOr(solver, pos, neg, frameAxioms[i][j]);
             }
         }
 
@@ -233,13 +233,19 @@ void sat_encoding(TaskProxy task_proxy, int steps) {
 
     cout << "That many clauses have been added: " << get_number_of_clauses() << endl;
     cout << ipasir_solve(solver) << endl;
-    /*int clause = capsule.number_of_variables;
+    int lit = capsule.number_of_variables;
     if (ipasir_solve(solver) == 10){
-        for (int v = 1; v <= clause; v++)
-            for (int i=0; i<operatorVars[timeStep].size(); i++) {
-                if (operatorVars[timeStep][i] == v) cout  << "V " << v << ": " << ipasir_val(solver,v) << endl;
+        for (int v = 1; v <= lit; v++) {
+            for (auto & it : operatorVars) {
+                for (int i=0; i<it.size(); i++) {
+                    if (it[i] == v and ipasir_val(solver,v) > 0) {
+                        cout  << "V " << v << ": " << ipasir_val(solver,v) << " ";
+                        cout << task_proxy.get_operators()[i].get_name() << endl;
+                    }
+                }
             }
-    }*/
+        }
+    }
 }
 
 }
