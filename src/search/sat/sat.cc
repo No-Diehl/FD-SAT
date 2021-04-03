@@ -1,4 +1,6 @@
 #include "sat.h"
+#include <cstdlib> // for exit-function
+#include <fstream> // for file generation
 #include <iostream>
 #include <unordered_map>
 
@@ -235,16 +237,32 @@ void sat_encoding(TaskProxy task_proxy, int steps) {
     cout << ipasir_solve(solver) << endl;
     int lit = capsule.number_of_variables;
     if (ipasir_solve(solver) == 10){
+        int step_counter = 0;
+        ofstream output;
+        output.open("found_plan");
+        if (!output) {
+            cerr << "Error: File could not be opened" << endl;
+            exit(1);
+        }
         for (int v = 1; v <= lit; v++) {
             for (auto & it : operatorVars) {
                 for (int i=0; i<it.size(); i++) {
                     if (it[i] == v and ipasir_val(solver,v) > 0) {
-                        cout  << "V " << v << ": " << ipasir_val(solver,v) << " ";
-                        cout << task_proxy.get_operators()[i].get_name() << endl;
+                        output << "(" <<task_proxy.get_operators()[i].get_name() << ")" << endl;
+                        step_counter++;
                     }
                 }
             }
         }
+        output << "; cost = " << step_counter << " (unit cost)";
+        output.close();
+        string validator = "validate";
+        string domain_file = "domain.pddl";
+        string problem_file = "problem-p01.pddl";
+        string plan_file = "found_plan";
+        string full_call = validator + " " + domain_file + " " + problem_file + " " + plan_file;
+        const char * cmd_call = full_call.c_str();
+        system(cmd_call);
     }
 }
 
