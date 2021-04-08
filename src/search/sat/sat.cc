@@ -1,7 +1,10 @@
 #include "sat.h"
+#include <bitset> // for binary number representation
+#include <cmath> // for ceil, log calculations
 #include <cstdlib> // for exit-function
 #include <fstream> // for file generation
 #include <iostream>
+#include <queue> // testing Queue
 #include <unordered_map>
 
 using namespace std;
@@ -31,11 +34,7 @@ void sat_solver_call() {
 }
 
 /* Using two 2D vectors to store the state variables (facts) for the current and
-       following time step.
-       TODO: Find a way to indicate which vector represents the current/following
-       state variables. It will alternate each timestep, since t+1 will become t in
-       the following iteration. And the contents of the former current state will be
-       replaced with the variables for the following time step. Pointers? Bool flag?
+   following time step.
 */
 vector<vector<int>> factsAtTnow;
 vector<vector<int>> factsAtTplusOne;
@@ -45,8 +44,6 @@ vector<vector<int>> factsAtTplusOne;
    (if true in the returned plan).
 */
 vector<vector<int>> operatorVars;
-
-// int timeStep = 0;
 
 void* solver = ipasir_init();
 
@@ -140,6 +137,69 @@ void sat_init(TaskProxy task_proxy, sat_capsule & capsule) {
     FactsProxyIterator fpi_begin = task_proxy.get_variables().get_facts().begin();
     FactsProxyIterator fpi_end = task_proxy.get_variables().get_facts().end();
     AbstractTask abs_task(tasks::g_root_task); geht nicht wegen Funktionen */
+}
+
+/* Using two 3D vectors to store the state variables (facts) for the current and
+   following time step.
+*/
+vector<vector<vector<int>>> binaryFactsAtTnow;
+vector<vector<vector<int>>> binaryFactsAtTplusOne;
+
+void sat_init_binary(TaskProxy task_proxy, sat_capsule & capsule) {
+    for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
+        vector<vector<int>> mutexGroupNow;
+        vector<vector<int>> mutexGroupPlusOne;
+        // Calculate number of needed variables to represent all facts of current mutex group.
+        int binaryVars;
+        /* 
+        Differentiate between powers of 2 and other numbers. Group sizes of exact powers of 2
+        need one bit less to represent all members.
+        Note: __builtin_popcount(unsigned int x) returns the num of 1-bits in x
+        */
+        if (__builtin_popcount(task_proxy.get_variables()[i].get_domain_size()) == 1) {
+            // Note: __builtin_ctz(unsigned int x) returns num of trailing 0-bits in x
+            binaryVars = __builtin_ctz(task_proxy.get_variables()[i].get_domain_size());
+        } else {
+            // Note: __builtin_clz(unsigned int x) return the num of leading 0-bits in x
+            binaryVars = sizeof(int)*8-__builtin_clz(task_proxy.get_variables()[i].get_domain_size());
+        }
+        // Vectors containing the template variables for a mutex group.
+        vector<int> factBinaryVarsNow;
+        vector<int> factBinaryVarsPlusOne;
+        for (int j=0; j<binaryVars; j++) {
+            factBinaryVarsNow.push_back(capsule.new_variable());
+            factBinaryVarsPlusOne.push_back(capsule.new_variable());
+        }
+        // Push the binary fact encodings into a vector, a positive int representing a 1-bit
+        // and a negative int representing a 0-bit using the registered template variables.
+        for (int k=0; k<task_proxy.get_variables()[i].get_domain_size(); k++) {
+            vector<int> factVarsStatesNow;
+            vector<int> factVarsStatesPlusOne;
+            for (int l=factBinaryVarsNow.size()-1; l>=0; l--) {
+                if (k & (1 << l)) {
+                    factVarsStatesNow.push_back(factBinaryVarsNow[factBinaryVarsNow.size()-1-l]);
+                    factVarsStatesPlusOne.push_back(factBinaryVarsPlusOne[factBinaryVarsPlusOne.size()-1-l]);
+                } else {
+                    factVarsStatesNow.push_back(-factBinaryVarsNow[factBinaryVarsNow.size()-1-l]);
+                    factVarsStatesPlusOne.push_back(-factBinaryVarsPlusOne[factBinaryVarsPlusOne.size()-1-l]);
+                }
+            }
+            mutexGroupNow.push_back(factVarsStatesNow);
+            mutexGroupPlusOne.push_back(factVarsStatesPlusOne);
+        }
+        binaryFactsAtTnow.push_back(mutexGroupNow);
+        binaryFactsAtTplusOne.push_back(mutexGroupPlusOne);
+    }
+
+    /*
+    // Initially fill the vector with the variables representing which operator
+    // was executed (if true in the returned plan) at t0.
+    vector<int> operatorsAtTnow;
+    for (size_t i=0; i<task_proxy.get_operators().size(); i++) {
+        operatorsAtTnow.push_back(capsule.new_variable());
+    }
+    operatorVars.push_back(operatorsAtTnow);
+    */
 }
 
 void sat_step(TaskProxy task_proxy, sat_capsule & capsule) {
@@ -264,6 +324,11 @@ void sat_encoding(TaskProxy task_proxy, int steps) {
         const char * cmd_call = full_call.c_str();
         system(cmd_call);
     }
+}
+
+void sat_encoding_binary(TaskProxy task_proxy, int steps) {
+    sat_capsule capsule;
+    sat_init_binary(task_proxy, capsule);
 }
 
 }
