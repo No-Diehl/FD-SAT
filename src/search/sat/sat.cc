@@ -456,7 +456,7 @@ void sat_encoding_binary(TaskProxy task_proxy, int steps) {
             cout << "Inserted into solver goal state: " << binaryFactsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value][j] << endl;
         }
     }
-
+    // TODO: Make this part a helper function!
     cout << "That many clauses have been added: " << get_number_of_clauses() << endl;
     cout << ipasir_solve(solver) << endl;
     int lit = capsule.number_of_variables;
