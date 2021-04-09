@@ -13,6 +13,7 @@ void sat_solver_call();
 void sat_init(TaskProxy task_proxy, sat_capsule & capsule);
 void sat_init_binary(TaskProxy task_proxy, sat_capsule & capsule);
 void sat_step(TaskProxy task_proxy, sat_capsule & capsule);
+void sat_step_binary(TaskProxy task_proxy, sat_capsule & capsule);
 void sat_encoding(TaskProxy task_proxy, int steps);
 void sat_encoding_binary(TaskProxy task_proxy, int steps);
 }

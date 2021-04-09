@@ -134,7 +134,8 @@ void andImplies(void* solver, int i, int j, int k){
 	number_of_clauses++;
 }
 
-void andImplies(void* solver, std::set<int> i, int j){
+// ND: Changed 2nd argument from set to vector. (Modification)
+void andImplies(void* solver, std::vector<int> & i, int j){
 	for (const int & x : i)
 		ipasir_add(solver,-x);
 	ipasir_add(solver,j);

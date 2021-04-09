@@ -173,6 +173,7 @@ void sat_init_binary(TaskProxy task_proxy, sat_capsule & capsule) {
         // Push the binary fact encodings into a vector, a positive int representing a 1-bit
         // and a negative int representing a 0-bit using the registered template variables.
         for (int k=0; k<task_proxy.get_variables()[i].get_domain_size(); k++) {
+            cout << "Variable " << k << " is called " << task_proxy.get_variables()[i].get_fact(k).get_name() << endl;
             vector<int> factVarsStatesNow;
             vector<int> factVarsStatesPlusOne;
             for (int l=factBinaryVarsNow.size()-1; l>=0; l--) {
@@ -190,8 +191,9 @@ void sat_init_binary(TaskProxy task_proxy, sat_capsule & capsule) {
         binaryFactsAtTnow.push_back(mutexGroupNow);
         binaryFactsAtTplusOne.push_back(mutexGroupPlusOne);
     }
+    cout << "States at t0: " << binaryFactsAtTnow << endl;
+    cout << "States at t1: " << binaryFactsAtTplusOne << endl;
 
-    /*
     // Initially fill the vector with the variables representing which operator
     // was executed (if true in the returned plan) at t0.
     vector<int> operatorsAtTnow;
@@ -199,7 +201,7 @@ void sat_init_binary(TaskProxy task_proxy, sat_capsule & capsule) {
         operatorsAtTnow.push_back(capsule.new_variable());
     }
     operatorVars.push_back(operatorsAtTnow);
-    */
+    cout << "Operators at t0: " << operatorVars << endl;
 }
 
 void sat_step(TaskProxy task_proxy, sat_capsule & capsule) {
@@ -218,6 +220,39 @@ void sat_step(TaskProxy task_proxy, sat_capsule & capsule) {
         operatorsAtTnow.push_back(capsule.new_variable());
     }
     operatorVars.push_back(operatorsAtTnow);
+}
+
+void sat_step_binary(TaskProxy task_proxy, sat_capsule & capsule) {
+    binaryFactsAtTnow.swap(binaryFactsAtTplusOne);
+    // Replace all the variables in binaryFactsAtTplusOne with new variables for the current time step.
+    for (size_t i=0; i<binaryFactsAtTplusOne.size(); i++) {
+        vector<int> newVariables;
+        if (newVariables.size()<=0) {
+            for (size_t j=0; j<binaryFactsAtTplusOne[i][0].size(); j++) {
+                newVariables.push_back(capsule.new_variable());
+            }
+        }
+        for (size_t j=0; j<binaryFactsAtTplusOne[i].size(); j++) {;
+            for (size_t k=0; k<binaryFactsAtTplusOne[i][j].size(); k++) {
+                if (binaryFactsAtTplusOne[i][j][k] < 0) {
+                    binaryFactsAtTplusOne[i][j][k] = -newVariables[k];
+                } else {
+                    binaryFactsAtTplusOne[i][j][k] = newVariables[k];
+                }
+                
+            }
+        }
+    }
+    cout << "Variables for next timestep: " << binaryFactsAtTplusOne << endl;
+
+    // Create a new vector<int> with variables representing which operator was executed
+    // (if true in the returned plan) at the current time step.
+    vector<int> operatorsAtTnow;
+    for (size_t i=0; i<task_proxy.get_operators().size(); i++) {
+        operatorsAtTnow.push_back(capsule.new_variable());
+    }
+    operatorVars.push_back(operatorsAtTnow);
+    cout << "Operator vars for next timestep: " << operatorVars << endl;
 }
 
 void sat_encoding(TaskProxy task_proxy, int steps) {
@@ -242,7 +277,7 @@ void sat_encoding(TaskProxy task_proxy, int steps) {
             atMostOne(solver, capsule, factsAtTplusOne[i]);
         }
 
-        // Vector to collect frame actions executing the same effects.
+        // Vector to collect actions/operators executing the same effects.
         vector<vector<vector<int>>> frameAxioms;
         for (int i=0; i<task_proxy.get_variables().size(); i++) {
             vector<vector<int>> variable;
@@ -329,6 +364,130 @@ void sat_encoding(TaskProxy task_proxy, int steps) {
 void sat_encoding_binary(TaskProxy task_proxy, int steps) {
     sat_capsule capsule;
     sat_init_binary(task_proxy, capsule);
+
+    // Add the binary variables reflecting the initial state of the problem.
+    for (size_t i=0; i<binaryFactsAtTnow.size(); i++) {
+        for (size_t j=0; j<binaryFactsAtTnow[i].size(); j++) {
+            if (task_proxy.get_initial_state().get_values()[i] == j) {
+                for (size_t k=0; k<binaryFactsAtTnow[i][j].size(); k++) {
+                    // Since polarity of the variables is already embedded in their encoding
+                    // they can be inserted as they are.
+                    assertYes(solver, binaryFactsAtTnow[i][j][k]);
+                    cout << "Inserted into solver: " << binaryFactsAtTnow[i][j][k] << endl;
+                }
+            }
+        }
+    }
+
+    for (int timeStep=0; timeStep<steps; timeStep++) {
+        // Add clauses reflecting the operators at the current time step.
+        for (OperatorProxy const & operators : task_proxy.get_operators()) {
+            int operatorVar = operatorVars[timeStep][operators.get_id()];
+            for (FactProxy const & preconditions : operators.get_preconditions()) {
+                for (size_t i=0; i<binaryFactsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value].size(); i++) {
+                    implies(solver, operatorVar, binaryFactsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value][i]);
+                    cout << "Inserted into solver precondition: " << binaryFactsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value][i] << " for operator " << operatorVar << endl;
+                }
+            }
+            for (EffectProxy const & effects : operators.get_effects()) {
+                for (size_t i=0; i<binaryFactsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_pair().value].size(); i++) {
+                    implies(solver, operatorVar, binaryFactsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_pair().value][i]);
+                    cout << "Inserted into solver effect: " << binaryFactsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_pair().value][i] << " for operator " << operatorVar << endl;
+                }
+            }
+        }
+
+        // Vector to collect frame axiom operators.
+        vector<vector<vector<int>>> frameAxioms;
+        for (int i=0; i<task_proxy.get_variables().size(); i++) {
+            vector<vector<int>> variable;
+            for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
+                vector<int> fact;
+                variable.push_back(fact);
+            }
+        frameAxioms.push_back(variable);
+        }
+
+
+        // Frame axioms.
+        for (OperatorProxy const & operators : task_proxy.get_operators()) {
+            int operatorVar = operatorVars[timeStep][operators.get_id()];
+            vector<int> frameAxiomVars;
+            vector<int> implicitFrameAxioms;
+            for (EffectProxy const & effects : operators.get_effects()) {
+                int effVar = effects.get_fact().get_pair().var;
+                // TODO: Not sure, if this is the best way to do this?!
+                bool matchFound = false;
+                for (FactProxy const & preconditions : operators.get_preconditions()) {
+                    if (preconditions.get_pair().var == effVar) {
+                        matchFound = true;
+                        for (int i=0; i<binaryFactsAtTnow[effVar][preconditions.get_pair().value].size(); i++) {
+                            frameAxiomVars.push_back(binaryFactsAtTnow[effVar][preconditions.get_pair().value][i]);
+                            frameAxiomVars.push_back(binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i]);
+                        }
+                    }
+                }
+                if (!matchFound && binaryFactsAtTplusOne[effVar].size() == 2) {
+                    implicitFrameAxioms.push_back(effVar);
+                }
+            }
+            for (int i=0; i<implicitFrameAxioms.size(); i++) {
+                frameAxiomVars.push_back(binaryFactsAtTnow[implicitFrameAxioms[i]][1][0]);
+                frameAxiomVars.push_back(binaryFactsAtTplusOne[implicitFrameAxioms[i]][0][0]);
+            }
+            andImplies(solver, frameAxiomVars, operatorVar);
+            cout << "Inserted into solver regular Frame Axiom: " << frameAxiomVars << " implies " << operatorVar << endl;
+        }
+        // Add clauses such that exactly one operator can be picked per time step.
+        atLeastOne(solver, capsule, operatorVars[timeStep]);
+        atMostOne(solver, capsule, operatorVars[timeStep]);
+
+        // At the end of one step prepare the next time step, if it isn't the last.
+        if (timeStep == steps-1) {
+            break;
+        } else {
+            sat_step_binary(task_proxy, capsule);
+        }
+    }
+    // Add the variables reflecting the goal state of the problem after the last time step.
+    for (size_t i=0; i<task_proxy.get_goals().size(); i++) {
+        for (size_t j=0; j<binaryFactsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value].size(); j++) {
+            assertYes(solver, binaryFactsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value][j]);
+            cout << "Inserted into solver goal state: " << binaryFactsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value][j] << endl;
+        }
+    }
+
+    cout << "That many clauses have been added: " << get_number_of_clauses() << endl;
+    cout << ipasir_solve(solver) << endl;
+    int lit = capsule.number_of_variables;
+    if (ipasir_solve(solver) == 10){
+        int step_counter = 0;
+        ofstream output;
+        output.open("found_plan_binary");
+        if (!output) {
+            cerr << "Error: File could not be opened" << endl;
+            exit(1);
+        }
+        for (int v = 1; v <= lit; v++) {
+            for (auto & it : operatorVars) {
+                for (int i=0; i<it.size(); i++) {
+                    if (it[i] == v and ipasir_val(solver,v) > 0) {
+                        output << "(" <<task_proxy.get_operators()[i].get_name() << ")" << endl;
+                        step_counter++;
+                    }
+                }
+            }
+        }
+        output << "; cost = " << step_counter << " (unit cost)";
+        output.close();
+        string validator = "validate";
+        string domain_file = "domain.pddl";
+        string problem_file = "problem-p03.pddl";
+        string plan_file = "found_plan_binary";
+        string full_call = validator + " " + domain_file + " " + problem_file + " " + plan_file;
+        const char * cmd_call = full_call.c_str();
+        system(cmd_call);
+    }
 }
 
 }
