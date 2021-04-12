@@ -352,7 +352,7 @@ void sat_encoding(TaskProxy task_proxy, int steps) {
         output.close();
         string validator = "validate";
         string domain_file = "domain.pddl";
-        string problem_file = "problem-p01.pddl";
+        string problem_file = "problem-p09.pddl";
         string plan_file = "found_plan";
         string full_call = validator + " " + domain_file + " " + problem_file + " " + plan_file;
         const char * cmd_call = full_call.c_str();
@@ -498,7 +498,7 @@ void sat_encoding_binary(TaskProxy task_proxy, int steps) {
         output.close();
         string validator = "validate";
         string domain_file = "domain.pddl";
-        string problem_file = "problem-p01.pddl";
+        string problem_file = "problem-p09.pddl";
         string plan_file = "found_plan_binary";
         string full_call = validator + " " + domain_file + " " + problem_file + " " + plan_file;
         const char * cmd_call = full_call.c_str();
