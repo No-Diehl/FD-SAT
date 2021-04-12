@@ -73,6 +73,7 @@ int get_number_of_clauses(){
 }
 
 void assertYes(void* solver, int i){
+    //std::cout << "Added " << i << std::endl;
 	ipasir_add(solver,i);
 	ipasir_add(solver,0);
 	number_of_clauses++;
@@ -86,6 +87,7 @@ void assertNot(void* solver, int i){
 
 void implies(void* solver, int i, int j){
 	//DEBUG(std::cout << "Adding " << -i << " " << j << " " << 0 << std::endl);
+    //std::cout << "Added " << -i << " " << j << std::endl;
 	ipasir_add(solver,-i);
 	ipasir_add(solver,j);
 	ipasir_add(solver,0);
@@ -109,10 +111,10 @@ void impliesOr(void* solver, int i, std::vector<int> & j){
 }
 
 void impliesPosAndNegImpliesOr(void* solver, int i, int j, std::vector<int> & k){
-    std::cout << "Inserted vector " << -i << " or " << j;
+    /*std::cout << "Inserted vector " << -i << " or " << j;
     for (int & x : k)
         std::cout << " or " << x;
-    std::cout << std::endl;
+    std::cout << std::endl;*/
 	ipasir_add(solver,-i);
 	ipasir_add(solver,j);
 	for (int & x : k)
@@ -162,8 +164,6 @@ void atMostOneBinomial(void* solver, sat_capsule & capsule, std::vector<int> & i
 		}
 	}
 }
-
-
 
 void atMostOne(void* solver, sat_capsule & capsule, std::vector<int> & is){
 	if (is.size() <= 1) return; // nothing to do
@@ -239,4 +239,3 @@ void atLeastOne(void* solver, sat_capsule & capsule, std::vector<int> & is){
 	ipasir_add(solver,0);
 	number_of_clauses++;
 }
-

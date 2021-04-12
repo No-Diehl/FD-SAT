@@ -190,8 +190,8 @@ void sat_init_binary(TaskProxy task_proxy, sat_capsule & capsule) {
         binaryFactsAtTnow.push_back(mutexGroupNow);
         binaryFactsAtTplusOne.push_back(mutexGroupPlusOne);
     }
-    cout << "States at t0: " << binaryFactsAtTnow << endl;
-    cout << "States at t1: " << binaryFactsAtTplusOne << endl;
+    //cout << "States at t0: " << binaryFactsAtTnow << endl;
+    //cout << "States at t1: " << binaryFactsAtTplusOne << endl;
 
     // Initially fill the vector with the variables representing which operator
     // was executed (if true in the returned plan) at t0.
@@ -200,7 +200,7 @@ void sat_init_binary(TaskProxy task_proxy, sat_capsule & capsule) {
         operatorsAtTnow.push_back(capsule.new_variable());
     }
     operatorVars.push_back(operatorsAtTnow);
-    cout << "Operators at t0: " << operatorVars << endl;
+    //cout << "Operators at t0: " << operatorVars << endl;
 }
 
 void sat_step(TaskProxy task_proxy, sat_capsule & capsule) {
@@ -222,11 +222,7 @@ void sat_step(TaskProxy task_proxy, sat_capsule & capsule) {
 }
 
 void sat_step_binary(TaskProxy task_proxy, sat_capsule & capsule) {
-    cout << "facts now: " << binaryFactsAtTnow << endl;
-    cout << "facts next step: " << binaryFactsAtTplusOne << endl;
     binaryFactsAtTnow.swap(binaryFactsAtTplusOne);
-    cout << "facts now after swap: " << binaryFactsAtTnow << endl;
-    cout << "facts next step after swap: " << binaryFactsAtTplusOne << endl;
     // Replace all the variables in binaryFactsAtTplusOne with new variables for the current time step.
     for (size_t i=0; i<binaryFactsAtTplusOne.size(); i++) {
         vector<int> newVariables;
@@ -246,7 +242,7 @@ void sat_step_binary(TaskProxy task_proxy, sat_capsule & capsule) {
             }
         }
     }
-    cout << "Variables for next timestep: " << binaryFactsAtTplusOne << endl;
+    //cout << "Variables for next timestep: " << binaryFactsAtTplusOne << endl;
 
     // Create a new vector<int> with variables representing which operator was executed
     // (if true in the returned plan) at the current time step.
@@ -255,7 +251,7 @@ void sat_step_binary(TaskProxy task_proxy, sat_capsule & capsule) {
         operatorsAtTnow.push_back(capsule.new_variable());
     }
     operatorVars.push_back(operatorsAtTnow);
-    cout << "Operator vars for next timestep: " << operatorVars << endl;
+    //cout << "Operator vars for next timestep: " << operatorVars << endl;
 }
 
 void sat_encoding(TaskProxy task_proxy, int steps) {
@@ -264,7 +260,7 @@ void sat_encoding(TaskProxy task_proxy, int steps) {
 
     // Add the variables reflecting the initial state of the problem.
     for (size_t i=0; i<factsAtTnow.size(); i++) {
-        for (size_t j=0; j<factsAtTnow[i].size(); j++) {
+        for (int j=0; j<factsAtTnow[i].size(); j++) {
             if (task_proxy.get_initial_state().get_values()[i] == j) {
                 assertYes(solver, factsAtTnow[i][j]);
             } else {
@@ -282,7 +278,7 @@ void sat_encoding(TaskProxy task_proxy, int steps) {
 
         // Vector to collect actions/operators executing the same effects.
         vector<vector<vector<int>>> frameAxioms;
-        for (int i=0; i<task_proxy.get_variables().size(); i++) {
+        for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
             vector<vector<int>> variable;
             for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
                 vector<int> fact;
@@ -306,8 +302,8 @@ void sat_encoding(TaskProxy task_proxy, int steps) {
         }
 
         // Add frame axiom clauses.
-        for (int i=0; i<frameAxioms.size(); i++) {
-            for (int j=0; j<frameAxioms[i].size(); j++) {
+        for (auto i=0; i<frameAxioms.size(); i++) {
+            for (auto j=0; j<frameAxioms[i].size(); j++) {
                 int neg = factsAtTnow[i][j];
                 int pos = factsAtTplusOne[i][j];
                 impliesPosAndNegImpliesOr(solver, pos, neg, frameAxioms[i][j]);
@@ -344,7 +340,7 @@ void sat_encoding(TaskProxy task_proxy, int steps) {
         }
         for (int v = 1; v <= lit; v++) {
             for (auto & it : operatorVars) {
-                for (int i=0; i<it.size(); i++) {
+                for (auto i=0; i<it.size(); i++) {
                     if (it[i] == v and ipasir_val(solver,v) > 0) {
                         output << "(" <<task_proxy.get_operators()[i].get_name() << ")" << endl;
                         step_counter++;
@@ -376,7 +372,6 @@ void sat_encoding_binary(TaskProxy task_proxy, int steps) {
                     // Since polarity of the variables is already embedded in their encoding
                     // they can be inserted as they are.
                     assertYes(solver, binaryFactsAtTnow[i][j][k]);
-                    cout << "Inserted into solver: " << binaryFactsAtTnow[i][j][k] << endl;
                 }
             }
         }
@@ -389,31 +384,25 @@ void sat_encoding_binary(TaskProxy task_proxy, int steps) {
             for (FactProxy const & preconditions : operators.get_preconditions()) {
                 for (size_t i=0; i<binaryFactsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value].size(); i++) {
                     implies(solver, operatorVar, binaryFactsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value][i]);
-                    cout << "Inserted into solver precondition: " << binaryFactsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value][i] << " for operator " << operatorVar << endl;
                 }
             }
             for (EffectProxy const & effects : operators.get_effects()) {
                 for (size_t i=0; i<binaryFactsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_pair().value].size(); i++) {
                     implies(solver, operatorVar, binaryFactsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_pair().value][i]);
-                    cout << "Inserted into solver effect: " << binaryFactsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_pair().value][i] << " for operator " << operatorVar << endl;
                 }
             }
         }
 
         // Vector to collect frame axiom operators.
         vector<vector<vector<int>>> frameAxioms;
-        for (int i=0; i<binaryFactsAtTnow.size(); i++) {
+        for (auto i=0; i<binaryFactsAtTnow.size(); i++) {
             vector<vector<int>> variable;
-            for (int j=0; j<=0; j++) {
-                for (int k=0; k<binaryFactsAtTnow[i][j].size(); k++) {
+            for (auto j=0; j<=0; j++) {
+                for (auto k=0; k<binaryFactsAtTnow[i][j].size(); k++) {
                     vector<int> upwardFlank;
                     variable.push_back(upwardFlank);
                     vector<int> downwardFlank;
                     variable.push_back(downwardFlank);
-                    vector<int> stayPositive;
-                    variable.push_back(stayPositive);
-                    vector<int> stayNegative;
-                    variable.push_back(stayNegative);
                 }
             }
         frameAxioms.push_back(variable);
@@ -429,35 +418,16 @@ void sat_encoding_binary(TaskProxy task_proxy, int steps) {
                 for (FactProxy const & preconditions : operators.get_preconditions()) {
                     if (preconditions.get_pair().var == effVar) {
                         matchFound = true;
-                        for (int i=0; i<binaryFactsAtTnow[effVar][preconditions.get_pair().value].size(); i++) {
+                        for (auto i=0; i<binaryFactsAtTnow[effVar][preconditions.get_pair().value].size(); i++) {
                             // Add operator to upward flank vector of fact variable i.
                             if (binaryFactsAtTnow[effVar][preconditions.get_pair().value][i]<0 && 
                                 binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i]>0) {
-                                    frameAxioms[effVar][0+4*i].push_back(operatorVar);
-                                    cout << "Added frame axiom " << binaryFactsAtTnow[effVar][preconditions.get_pair().value][i] <<
-                                    " and " << binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i] <<
-                                    " implies " << operatorVar << endl;
+                                    frameAxioms[effVar][0+2*i].push_back(operatorVar);
                             // Add operator to downward flank vector of fact variable i.
                             } else if (binaryFactsAtTnow[effVar][preconditions.get_pair().value][i]>0 && 
                                 binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i]<0) {
-                                    frameAxioms[effVar][1+4*i].push_back(operatorVar);
-                                    cout << "Added frame axiom " << binaryFactsAtTnow[effVar][preconditions.get_pair().value][i] <<
-                                    " and " << binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i] <<
-                                    " implies " << operatorVar << endl;
+                                    frameAxioms[effVar][1+2*i].push_back(operatorVar);
                             // var stays positive
-                            } else if (binaryFactsAtTnow[effVar][preconditions.get_pair().value][i]>0 && 
-                                binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i]>0) {
-                                    frameAxioms[effVar][2+4*i].push_back(operatorVar);
-                                    cout << "Added frame axiom " << binaryFactsAtTnow[effVar][preconditions.get_pair().value][i] <<
-                                    " and " << binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i] <<
-                                    " implies " << operatorVar << endl;
-                            // var stays negative
-                            } else if (binaryFactsAtTnow[effVar][preconditions.get_pair().value][i]<0 && 
-                                binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i]<0) {
-                                    frameAxioms[effVar][3+4*i].push_back(operatorVar);
-                                    cout << "Added frame axiom " << binaryFactsAtTnow[effVar][preconditions.get_pair().value][i] <<
-                                    " and " << binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i] <<
-                                    " implies " << operatorVar << endl;
                             }
                         }
                     }
@@ -466,35 +436,20 @@ void sat_encoding_binary(TaskProxy task_proxy, int steps) {
                     // Add operator to downward flank vector of fact variable. Special case when the
                     // effect doen't have a corresponding precondition in the operator.
                     frameAxioms[effVar][1].push_back(operatorVar);
-                    cout << "Added frame axiom " << -binaryFactsAtTnow[effVar][effects.get_fact().get_pair().value][0] <<
-                    " and " << binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][0] <<
-                    " implies " << operatorVar << endl;
                 }
             }
         }
-        for (int i=0; i<frameAxioms.size(); i++) {
-            cout << frameAxioms.size() << " vectors in frameAxioms." << endl;
-            for (int j=0; j<frameAxioms[i].size(); j++) {
-                cout << frameAxioms[i].size() << " vectors in frameAxioms[" << i << "].\n";
-                if (j%4 == 0 && frameAxioms[i][j].size()>0) {
+        for (auto i=0; i<frameAxioms.size(); i++) {
+            for (auto j=0; j<frameAxioms[i].size(); j++) {
+                if (j%2 == 0 && frameAxioms[i][j].size()>0) {
                     // upward flank
-                    int neg = -binaryFactsAtTnow[i][0][j/4];
-                    int pos = -binaryFactsAtTplusOne[i][0][j/4];
+                    int neg = -binaryFactsAtTnow[i][0][j/2];
+                    int pos = -binaryFactsAtTplusOne[i][0][j/2];
                     impliesPosAndNegImpliesOr(solver, pos, neg, frameAxioms[i][j]);
-                } else if (j%4 == 1 && frameAxioms[i][j].size()>0) {
+                } else if (j%2 == 1 && frameAxioms[i][j].size()>0) {
                     // downward flank
-                    int pos = -binaryFactsAtTnow[i][0][j/4];
-                    int neg = -binaryFactsAtTplusOne[i][0][j/4];
-                    impliesPosAndNegImpliesOr(solver, pos, neg, frameAxioms[i][j]);
-                } else if (j%4 == 2 && frameAxioms[i][j].size()>0) {
-                    // stay up
-                    int pos = -binaryFactsAtTnow[i][0][j/4];
-                    int neg = binaryFactsAtTplusOne[i][0][j/4];
-                    impliesPosAndNegImpliesOr(solver, pos, neg, frameAxioms[i][j]);
-                } else if (j%4 == 3 && frameAxioms[i][j].size()>0) {
-                    // stay down
-                    int neg = -binaryFactsAtTnow[i][0][j/4];
-                    int pos = binaryFactsAtTplusOne[i][0][j/4];
+                    int pos = -binaryFactsAtTnow[i][0][j/2];
+                    int neg = -binaryFactsAtTplusOne[i][0][j/2];
                     impliesPosAndNegImpliesOr(solver, pos, neg, frameAxioms[i][j]);
                 }
             }
@@ -531,7 +486,7 @@ void sat_encoding_binary(TaskProxy task_proxy, int steps) {
         }
         for (int v = 1; v <= lit; v++) {
             for (auto & it : operatorVars) {
-                for (int i=0; i<it.size(); i++) {
+                for (auto i=0; i<it.size(); i++) {
                     if (it[i] == v and ipasir_val(solver,v) > 0) {
                         output << "(" <<task_proxy.get_operators()[i].get_name() << ")" << endl;
                         step_counter++;
@@ -543,7 +498,7 @@ void sat_encoding_binary(TaskProxy task_proxy, int steps) {
         output.close();
         string validator = "validate";
         string domain_file = "domain.pddl";
-        string problem_file = "problem-p03.pddl";
+        string problem_file = "problem-p01.pddl";
         string plan_file = "found_plan_binary";
         string full_call = validator + " " + domain_file + " " + problem_file + " " + plan_file;
         const char * cmd_call = full_call.c_str();
