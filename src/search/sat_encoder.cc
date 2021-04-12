@@ -109,6 +109,10 @@ void impliesOr(void* solver, int i, std::vector<int> & j){
 }
 
 void impliesPosAndNegImpliesOr(void* solver, int i, int j, std::vector<int> & k){
+    std::cout << "Inserted vector " << -i << " or " << j;
+    for (int & x : k)
+        std::cout << " or " << x;
+    std::cout << std::endl;
 	ipasir_add(solver,-i);
 	ipasir_add(solver,j);
 	for (int & x : k)

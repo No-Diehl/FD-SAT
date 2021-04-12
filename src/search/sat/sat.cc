@@ -173,7 +173,6 @@ void sat_init_binary(TaskProxy task_proxy, sat_capsule & capsule) {
         // Push the binary fact encodings into a vector, a positive int representing a 1-bit
         // and a negative int representing a 0-bit using the registered template variables.
         for (int k=0; k<task_proxy.get_variables()[i].get_domain_size(); k++) {
-            cout << "Variable " << k << " is called " << task_proxy.get_variables()[i].get_fact(k).get_name() << endl;
             vector<int> factVarsStatesNow;
             vector<int> factVarsStatesPlusOne;
             for (int l=factBinaryVarsNow.size()-1; l>=0; l--) {
@@ -223,7 +222,11 @@ void sat_step(TaskProxy task_proxy, sat_capsule & capsule) {
 }
 
 void sat_step_binary(TaskProxy task_proxy, sat_capsule & capsule) {
+    cout << "facts now: " << binaryFactsAtTnow << endl;
+    cout << "facts next step: " << binaryFactsAtTplusOne << endl;
     binaryFactsAtTnow.swap(binaryFactsAtTplusOne);
+    cout << "facts now after swap: " << binaryFactsAtTnow << endl;
+    cout << "facts next step after swap: " << binaryFactsAtTplusOne << endl;
     // Replace all the variables in binaryFactsAtTplusOne with new variables for the current time step.
     for (size_t i=0; i<binaryFactsAtTplusOne.size(); i++) {
         vector<int> newVariables;
@@ -399,21 +402,26 @@ void sat_encoding_binary(TaskProxy task_proxy, int steps) {
 
         // Vector to collect frame axiom operators.
         vector<vector<vector<int>>> frameAxioms;
-        for (int i=0; i<task_proxy.get_variables().size(); i++) {
+        for (int i=0; i<binaryFactsAtTnow.size(); i++) {
             vector<vector<int>> variable;
-            for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
-                vector<int> fact;
-                variable.push_back(fact);
+            for (int j=0; j<=0; j++) {
+                for (int k=0; k<binaryFactsAtTnow[i][j].size(); k++) {
+                    vector<int> upwardFlank;
+                    variable.push_back(upwardFlank);
+                    vector<int> downwardFlank;
+                    variable.push_back(downwardFlank);
+                    vector<int> stayPositive;
+                    variable.push_back(stayPositive);
+                    vector<int> stayNegative;
+                    variable.push_back(stayNegative);
+                }
             }
         frameAxioms.push_back(variable);
         }
 
-
-        // Frame axioms.
+        // Find all frame axioms.
         for (OperatorProxy const & operators : task_proxy.get_operators()) {
             int operatorVar = operatorVars[timeStep][operators.get_id()];
-            vector<int> frameAxiomVars;
-            vector<int> implicitFrameAxioms;
             for (EffectProxy const & effects : operators.get_effects()) {
                 int effVar = effects.get_fact().get_pair().var;
                 // TODO: Not sure, if this is the best way to do this?!
@@ -422,22 +430,76 @@ void sat_encoding_binary(TaskProxy task_proxy, int steps) {
                     if (preconditions.get_pair().var == effVar) {
                         matchFound = true;
                         for (int i=0; i<binaryFactsAtTnow[effVar][preconditions.get_pair().value].size(); i++) {
-                            frameAxiomVars.push_back(binaryFactsAtTnow[effVar][preconditions.get_pair().value][i]);
-                            frameAxiomVars.push_back(binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i]);
+                            // Add operator to upward flank vector of fact variable i.
+                            if (binaryFactsAtTnow[effVar][preconditions.get_pair().value][i]<0 && 
+                                binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i]>0) {
+                                    frameAxioms[effVar][0+4*i].push_back(operatorVar);
+                                    cout << "Added frame axiom " << binaryFactsAtTnow[effVar][preconditions.get_pair().value][i] <<
+                                    " and " << binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i] <<
+                                    " implies " << operatorVar << endl;
+                            // Add operator to downward flank vector of fact variable i.
+                            } else if (binaryFactsAtTnow[effVar][preconditions.get_pair().value][i]>0 && 
+                                binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i]<0) {
+                                    frameAxioms[effVar][1+4*i].push_back(operatorVar);
+                                    cout << "Added frame axiom " << binaryFactsAtTnow[effVar][preconditions.get_pair().value][i] <<
+                                    " and " << binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i] <<
+                                    " implies " << operatorVar << endl;
+                            // var stays positive
+                            } else if (binaryFactsAtTnow[effVar][preconditions.get_pair().value][i]>0 && 
+                                binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i]>0) {
+                                    frameAxioms[effVar][2+4*i].push_back(operatorVar);
+                                    cout << "Added frame axiom " << binaryFactsAtTnow[effVar][preconditions.get_pair().value][i] <<
+                                    " and " << binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i] <<
+                                    " implies " << operatorVar << endl;
+                            // var stays negative
+                            } else if (binaryFactsAtTnow[effVar][preconditions.get_pair().value][i]<0 && 
+                                binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i]<0) {
+                                    frameAxioms[effVar][3+4*i].push_back(operatorVar);
+                                    cout << "Added frame axiom " << binaryFactsAtTnow[effVar][preconditions.get_pair().value][i] <<
+                                    " and " << binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i] <<
+                                    " implies " << operatorVar << endl;
+                            }
                         }
                     }
                 }
                 if (!matchFound && binaryFactsAtTplusOne[effVar].size() == 2) {
-                    implicitFrameAxioms.push_back(effVar);
+                    // Add operator to downward flank vector of fact variable. Special case when the
+                    // effect doen't have a corresponding precondition in the operator.
+                    frameAxioms[effVar][1].push_back(operatorVar);
+                    cout << "Added frame axiom " << -binaryFactsAtTnow[effVar][effects.get_fact().get_pair().value][0] <<
+                    " and " << binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][0] <<
+                    " implies " << operatorVar << endl;
                 }
             }
-            for (int i=0; i<implicitFrameAxioms.size(); i++) {
-                frameAxiomVars.push_back(binaryFactsAtTnow[implicitFrameAxioms[i]][1][0]);
-                frameAxiomVars.push_back(binaryFactsAtTplusOne[implicitFrameAxioms[i]][0][0]);
-            }
-            andImplies(solver, frameAxiomVars, operatorVar);
-            cout << "Inserted into solver regular Frame Axiom: " << frameAxiomVars << " implies " << operatorVar << endl;
         }
+        for (int i=0; i<frameAxioms.size(); i++) {
+            cout << frameAxioms.size() << " vectors in frameAxioms." << endl;
+            for (int j=0; j<frameAxioms[i].size(); j++) {
+                cout << frameAxioms[i].size() << " vectors in frameAxioms[" << i << "].\n";
+                if (j%4 == 0 && frameAxioms[i][j].size()>0) {
+                    // upward flank
+                    int neg = -binaryFactsAtTnow[i][0][j/4];
+                    int pos = -binaryFactsAtTplusOne[i][0][j/4];
+                    impliesPosAndNegImpliesOr(solver, pos, neg, frameAxioms[i][j]);
+                } else if (j%4 == 1 && frameAxioms[i][j].size()>0) {
+                    // downward flank
+                    int pos = -binaryFactsAtTnow[i][0][j/4];
+                    int neg = -binaryFactsAtTplusOne[i][0][j/4];
+                    impliesPosAndNegImpliesOr(solver, pos, neg, frameAxioms[i][j]);
+                } else if (j%4 == 2 && frameAxioms[i][j].size()>0) {
+                    // stay up
+                    int pos = -binaryFactsAtTnow[i][0][j/4];
+                    int neg = binaryFactsAtTplusOne[i][0][j/4];
+                    impliesPosAndNegImpliesOr(solver, pos, neg, frameAxioms[i][j]);
+                } else if (j%4 == 3 && frameAxioms[i][j].size()>0) {
+                    // stay down
+                    int neg = -binaryFactsAtTnow[i][0][j/4];
+                    int pos = binaryFactsAtTplusOne[i][0][j/4];
+                    impliesPosAndNegImpliesOr(solver, pos, neg, frameAxioms[i][j]);
+                }
+            }
+        }
+
         // Add clauses such that exactly one operator can be picked per time step.
         atLeastOne(solver, capsule, operatorVars[timeStep]);
         atMostOne(solver, capsule, operatorVars[timeStep]);
@@ -453,7 +515,6 @@ void sat_encoding_binary(TaskProxy task_proxy, int steps) {
     for (size_t i=0; i<task_proxy.get_goals().size(); i++) {
         for (size_t j=0; j<binaryFactsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value].size(); j++) {
             assertYes(solver, binaryFactsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value][j]);
-            cout << "Inserted into solver goal state: " << binaryFactsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value][j] << endl;
         }
     }
     // TODO: Make this part a helper function!
