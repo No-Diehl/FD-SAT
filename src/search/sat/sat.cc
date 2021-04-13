@@ -1,11 +1,9 @@
 #include "sat.h"
-#include <bitset> // for binary number representation
-#include <cmath> // for ceil, log calculations
+#include <unistd.h> // for directory path
 #include <cstdlib> // for exit-function
 #include <fstream> // for file generation
 #include <iostream>
-#include <queue> // testing Queue
-#include <unordered_map>
+
 
 using namespace std;
 
@@ -221,37 +219,6 @@ void sat_init_binary(TaskProxy task_proxy, sat_capsule & capsule) {
     forbidden_binary_states(binaryFactsAtTnow);
     forbidden_binary_states(binaryFactsAtTplusOne);
 
-    /*
-    vector<vector<int>> forbiddenStates;
-    for (auto i=0; i<binaryFactsAtTnow.size(); i++) {
-        if (binaryFactsAtTnow[i].size()%2 != 0) {
-            int bits = sizeof(int)*8-__builtin_clz(binaryFactsAtTnow[i].size());
-            int nxtPowOfTwo = 2;
-            for (int i=1; i<bits; i++) {nxtPowOfTwo *= 2;}
-            for (int j=binaryFactsAtTnow[i].size(); j<nxtPowOfTwo; j++) {
-                int count = 0;
-                vector<int> forbiddenStateNow;
-                vector<int> forbiddenStatePlusOne;
-                for (int k=binaryFactsAtTnow[i][0].size()-1; k>=0; k--) {
-                    if (j & (1 << k)) {
-                        forbiddenStateNow.push_back(binaryFactsAtTnow[i][0][count]);
-                        forbiddenStatePlusOne.push_back(binaryFactsAtTplusOne[i][0][count]);
-                        count++;
-                    } else {
-                        forbiddenStateNow.push_back(-binaryFactsAtTnow[i][0][count]);
-                        forbiddenStatePlusOne.push_back(-binaryFactsAtTplusOne[i][0][count]);
-                        count++;
-                    }
-                }
-                forbiddenStates.push_back(forbiddenStateNow);
-                forbiddenStates.push_back(forbiddenStatePlusOne);
-            }
-        }
-    }
-    for (auto i=0; i<forbiddenStates.size(); i++) {
-        assertOr(solver, forbiddenStates[i]);
-    } */
-
     // Initially fill the vector with the variables representing which operator
     // was executed (if true in the returned plan) at t0.
     vector<int> operatorsAtTnow;
@@ -314,6 +281,58 @@ void sat_step_binary(TaskProxy task_proxy, sat_capsule & capsule) {
     }
     operatorVars.push_back(operatorsAtTnow);
     //cout << "Operator vars for next timestep: " << operatorVars << endl;
+}
+
+void output_plan_validate(TaskProxy task_proxy, sat_capsule & capsule, bool binary) {
+    cout << "Please enter the program call for an installed validator [default=validate]: ";
+    string validator = "validate";
+    string input_validator;
+    getline(cin, validator);
+    if (!input_validator.empty()) {
+        validator = input_validator;
+    }
+    string domain_file = "domain.pddl";
+    cout << "Please enter a problem file name: ";
+    string problem_file;
+    getline(cin, problem_file);
+    /*
+    char buff[FILENAME_MAX]; //create string buffer to hold path
+    getcwd(buff, FILENAME_MAX);
+    string current_working_dir(buff);
+    */
+    string plan_file = "found_plan";
+    if (binary) {
+        plan_file = "found_plan_binary";
+    }
+
+    int lit = capsule.number_of_variables;
+    if (ipasir_solve(solver) == 10){
+        int step_counter = 0;
+        ofstream output;
+        output.open(plan_file);
+        if (!output) {
+            cerr << "Error: File could not be opened" << endl;
+            exit(1);
+        }
+        for (int v = 1; v <= lit; v++) {
+            for (auto & it : operatorVars) {
+                for (auto i=0; i<it.size(); i++) {
+                    if (it[i] == v and ipasir_val(solver,v) > 0) {
+                        output << "(" <<task_proxy.get_operators()[i].get_name() << ")" << endl;
+                        step_counter++;
+                    }
+                }
+            }
+        }
+        output << "; cost = " << step_counter << " (unit cost)";
+        output.close();
+        string full_call = validator + " " + domain_file + " " + problem_file + " " + plan_file;
+        const char * cmd_call = full_call.c_str();
+        int call = system(cmd_call);
+        if (call == -1) {
+            cerr << "Error: Failed to call the validator!" << endl;
+        }
+    }
 }
 
 void sat_encoding(TaskProxy task_proxy, int steps) {
@@ -391,6 +410,8 @@ void sat_encoding(TaskProxy task_proxy, int steps) {
 
     cout << "That many clauses have been added: " << get_number_of_clauses() << endl;
     cout << ipasir_solve(solver) << endl;
+    // output_plan_validate(task_proxy, capsule, false);
+    
     int lit = capsule.number_of_variables;
     if (ipasir_solve(solver) == 10){
         int step_counter = 0;
@@ -410,11 +431,12 @@ void sat_encoding(TaskProxy task_proxy, int steps) {
                 }
             }
         }
+
         output << "; cost = " << step_counter << " (unit cost)";
         output.close();
         string validator = "validate";
         string domain_file = "domain.pddl";
-        string problem_file = "problem-p09.pddl";
+        string problem_file = "problem-p01.pddl";
         string plan_file = "found_plan";
         string full_call = validator + " " + domain_file + " " + problem_file + " " + plan_file;
         const char * cmd_call = full_call.c_str();
@@ -537,6 +559,8 @@ void sat_encoding_binary(TaskProxy task_proxy, int steps) {
     // TODO: Make this part a helper function!
     cout << "That many clauses have been added: " << get_number_of_clauses() << endl;
     cout << ipasir_solve(solver) << endl;
+    // output_plan_validate(task_proxy, capsule, true);
+    
     int lit = capsule.number_of_variables;
     if (ipasir_solve(solver) == 10){
         int step_counter = 0;
