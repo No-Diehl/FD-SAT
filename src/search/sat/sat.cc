@@ -405,7 +405,7 @@ void sat_encoding_binary(TaskProxy task_proxy, int steps) {
                     variable.push_back(downwardFlank);
                 }
             }
-        frameAxioms.push_back(variable);
+        	frameAxioms.push_back(variable);
         }
 
         // Find all frame axioms.
