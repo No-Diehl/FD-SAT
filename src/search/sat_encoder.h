@@ -37,6 +37,7 @@ int get_number_of_clauses();
 
 void assertYes(void* solver, int i);
 void assertNot(void* solver, int i);
+void assertOr(void* solver, std::vector<int> & i);
 
 void implies(void* solver, int i, int j);
 void impliesNot(void* solver, int i, int j);

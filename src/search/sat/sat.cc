@@ -145,6 +145,30 @@ void sat_init(TaskProxy task_proxy, sat_capsule & capsule) {
 vector<vector<vector<int>>> binaryFactsAtTnow;
 vector<vector<vector<int>>> binaryFactsAtTplusOne;
 
+void forbidden_binary_states(vector<vector<vector<int>>> & binaryFacts) {
+    for (auto i=0; i<binaryFacts.size(); i++) {
+        if (binaryFacts[i].size()%2 != 0) {
+            int bits = sizeof(int)*8-__builtin_clz(binaryFacts[i].size());
+            int nxtPowOfTwo = 2;
+            for (int i=1; i<bits; i++) {nxtPowOfTwo *= 2;}
+            for (int j=binaryFacts[i].size(); j<nxtPowOfTwo; j++) {
+                int count = 0;
+                vector<int> forbiddenState;
+                for (int k=binaryFacts[i][0].size()-1; k>=0; k--) {
+                    if (j & (1 << k)) {
+                        forbiddenState.push_back(binaryFacts[i][0][count]);
+                        count++;
+                    } else {
+                        forbiddenState.push_back(-binaryFacts[i][0][count]);
+                        count++;
+                    }
+                }
+                assertOr(solver, forbiddenState);
+            }
+        }
+    }
+}
+
 void sat_init_binary(TaskProxy task_proxy, sat_capsule & capsule) {
     for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
         vector<vector<int>> mutexGroupNow;
@@ -192,6 +216,41 @@ void sat_init_binary(TaskProxy task_proxy, sat_capsule & capsule) {
     }
     //cout << "States at t0: " << binaryFactsAtTnow << endl;
     //cout << "States at t1: " << binaryFactsAtTplusOne << endl;
+
+    // Find and add the unused binary states for the mutex groups.
+    forbidden_binary_states(binaryFactsAtTnow);
+    forbidden_binary_states(binaryFactsAtTplusOne);
+
+    /*
+    vector<vector<int>> forbiddenStates;
+    for (auto i=0; i<binaryFactsAtTnow.size(); i++) {
+        if (binaryFactsAtTnow[i].size()%2 != 0) {
+            int bits = sizeof(int)*8-__builtin_clz(binaryFactsAtTnow[i].size());
+            int nxtPowOfTwo = 2;
+            for (int i=1; i<bits; i++) {nxtPowOfTwo *= 2;}
+            for (int j=binaryFactsAtTnow[i].size(); j<nxtPowOfTwo; j++) {
+                int count = 0;
+                vector<int> forbiddenStateNow;
+                vector<int> forbiddenStatePlusOne;
+                for (int k=binaryFactsAtTnow[i][0].size()-1; k>=0; k--) {
+                    if (j & (1 << k)) {
+                        forbiddenStateNow.push_back(binaryFactsAtTnow[i][0][count]);
+                        forbiddenStatePlusOne.push_back(binaryFactsAtTplusOne[i][0][count]);
+                        count++;
+                    } else {
+                        forbiddenStateNow.push_back(-binaryFactsAtTnow[i][0][count]);
+                        forbiddenStatePlusOne.push_back(-binaryFactsAtTplusOne[i][0][count]);
+                        count++;
+                    }
+                }
+                forbiddenStates.push_back(forbiddenStateNow);
+                forbiddenStates.push_back(forbiddenStatePlusOne);
+            }
+        }
+    }
+    for (auto i=0; i<forbiddenStates.size(); i++) {
+        assertOr(solver, forbiddenStates[i]);
+    } */
 
     // Initially fill the vector with the variables representing which operator
     // was executed (if true in the returned plan) at t0.
@@ -243,6 +302,9 @@ void sat_step_binary(TaskProxy task_proxy, sat_capsule & capsule) {
         }
     }
     //cout << "Variables for next timestep: " << binaryFactsAtTplusOne << endl;
+
+    // Find and add forbidden states of the binary fact mutex groups.
+    forbidden_binary_states(binaryFactsAtTplusOne);
 
     // Create a new vector<int> with variables representing which operator was executed
     // (if true in the returned plan) at the current time step.
@@ -498,7 +560,7 @@ void sat_encoding_binary(TaskProxy task_proxy, int steps) {
         output.close();
         string validator = "validate";
         string domain_file = "domain.pddl";
-        string problem_file = "problem-p09.pddl";
+        string problem_file = "problem-p01.pddl";
         string plan_file = "found_plan_binary";
         string full_call = validator + " " + domain_file + " " + problem_file + " " + plan_file;
         const char * cmd_call = full_call.c_str();
