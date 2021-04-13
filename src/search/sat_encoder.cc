@@ -85,6 +85,17 @@ void assertNot(void* solver, int i){
 	number_of_clauses++;
 }
 
+void assertOr(void* solver, std::vector<int> & i) {
+    std::cout << "Adding ";
+    for (int & x : i)
+        std::cout << x << " or ";
+    std::cout << "<-- ends before this or." << std::endl;
+    for (int & x : i)
+        ipasir_add(solver,x);
+    ipasir_add(solver,0);
+    number_of_clauses++;
+}
+
 void implies(void* solver, int i, int j){
 	//DEBUG(std::cout << "Adding " << -i << " " << j << " " << 0 << std::endl);
     //std::cout << "Added " << -i << " " << j << std::endl;

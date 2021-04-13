@@ -37,7 +37,7 @@ int main(int argc, const char **argv) {
         // sat_capsule capsule;
         // sat::sat_init(task_proxy, capsule);
         // sat::sat_encoding(task_proxy, 32);
-        sat::sat_encoding_binary(task_proxy, 28);
+        sat::sat_encoding_binary(task_proxy, 32);
         // cout << ipasir_signature() << endl;
          
     }
