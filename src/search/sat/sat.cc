@@ -375,10 +375,9 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     cout << ipasir_solve(solver) << endl;
     solution_timer.stop();
     cout << "[solvingTime=" << solution_timer << "]" << endl;
-    // output_plan_validate(task_proxy, capsule, false);
 
+    // If no plan is found exit the function by returning false and trigger next iteration.
     if (ipasir_solve(solver) == 20) {
-        //ipasir_release(solver);
         return false;
     }
     
@@ -394,16 +393,14 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
         const char * cmd_call = full_call.c_str();
         int val_return = system(cmd_call);
         if (val_return == 0) {
-            //ipasir_release(solver);
             return true;
         } else {
             cerr << "ERROR: Calling validator failed!" << endl;
-            //ipasir_release(solver);
             return true;
         }
     }
     // To make compiler shut up.
-    return false;
+    return true;
 }
 
 bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
@@ -544,10 +541,9 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     cout << ipasir_solve(solver) << endl;
     solution_timer.stop();
     cout << "[solvingTime=" << solution_timer << "]" << endl;
-    // output_plan_validate(task_proxy, capsule, true);
 
+    // If no plan is found exit the function by returning false and trigger next iteration.
     if (ipasir_solve(solver) == 20) {
-        //ipasir_release(solver);
         return false;
     }
     
@@ -562,16 +558,14 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
         const char * cmd_call = full_call.c_str();
         int val_return = system(cmd_call);
         if (val_return == 0) {
-            //ipasir_release(solver);
             return true;
         } else {
             cerr << "ERROR: Calling validator failed!" << endl;
-            //ipasir_release(solver);
             return true;
         }
     }
     // To make compiler shut up.
-    return false;
+    return true;
 }
 
 }
