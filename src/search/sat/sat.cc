@@ -215,6 +215,26 @@ void sat_step_binary(TaskProxy task_proxy,
     //cout << "Operator vars for next timestep: " << operatorVars << endl;
 }
 
+void found_plan(int vars, TaskProxy task_proxy, void * solver, const vector<vector<int>> & operatorVars, bool binary) {
+    PlanManager plan_man;
+    if (binary) {
+        plan_man.set_plan_filename("found_plan_binary");
+    } else {
+        plan_man.set_plan_filename("found_plan");
+    }
+    Plan plan;
+    for (int v = 1; v <= vars; v++) {
+        for (auto & it : operatorVars) {
+            for (size_t i=0; i<it.size(); i++) {
+                if (it[i] == v and ipasir_val(solver,v) > 0) {
+                    plan.push_back(OperatorID(task_proxy.get_operators()[i].get_id()));
+                }
+            }
+        }
+    }
+    plan_man.save_plan(plan, task_proxy);
+}
+
 bool sat_encoding(TaskProxy task_proxy, int steps) {
     // Start encoding timer here.
     utils::Timer enc_timer;
@@ -341,7 +361,8 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     // Stop encoding timer here.
     enc_timer.stop();
     cout << "[encodingTime=" << enc_timer << "]" << endl;
-    cout << "That many clauses have been added: " << get_number_of_clauses() << endl;
+    cout << capsule.number_of_variables << " variables have been created." << endl;
+    cout << get_number_of_clauses() << " clauses have been added." << endl;
     reset_number_of_clauses();
     cout << "[InitClauses=" << init_clauses << "]" << endl;
     cout << "[GoalClauses=" << goal_clauses << "]" << endl;
@@ -361,28 +382,10 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
         return false;
     }
     
-    int lit = capsule.number_of_variables;
     if (ipasir_solve(solver) == 10){
-        int step_counter = 0;
-        ofstream output;
-        output.open("found_plan");
-        if (!output) {
-            cerr << "Error: File could not be opened" << endl;
-            exit(1);
-        }
-        for (int v = 1; v <= lit; v++) {
-            for (auto & it : operatorVars) {
-                for (size_t i=0; i<it.size(); i++) {
-                    if (it[i] == v and ipasir_val(solver,v) > 0) {
-                        output << "(" <<task_proxy.get_operators()[i].get_name() << ")" << endl;
-                        step_counter++;
-                    }
-                }
-            }
-        }
+        // Use plan_manager to save a found plan.
+        found_plan(capsule.number_of_variables, task_proxy, solver, operatorVars, false);
 
-        output << "; cost = " << step_counter << " (unit cost)";
-        output.close();
         string validator = "validate";
         string domain_file = "domain.pddl";
         string problem_file = "problem-p01.pddl";
@@ -548,27 +551,9 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
         return false;
     }
     
-    int lit = capsule.number_of_variables;
     if (ipasir_solve(solver) == 10){
-        int step_counter = 0;
-        ofstream output;
-        output.open("found_plan_binary");
-        if (!output) {
-            cerr << "Error: File could not be opened" << endl;
-            exit(1);
-        }
-        for (int v = 1; v <= lit; v++) {
-            for (auto & it : operatorVars) {
-                for (size_t i=0; i<it.size(); i++) {
-                    if (it[i] == v and ipasir_val(solver,v) > 0) {
-                        output << "(" <<task_proxy.get_operators()[i].get_name() << ")" << endl;
-                        step_counter++;
-                    }
-                }
-            }
-        }
-        output << "; cost = " << step_counter << " (unit cost)";
-        output.close();
+        found_plan(capsule.number_of_variables, task_proxy, solver, operatorVars, true);
+    
         string validator = "validate";
         string domain_file = "domain.pddl";
         string problem_file = "problem-p01.pddl";
