@@ -145,7 +145,7 @@ vector<vector<vector<int>>> binaryFactsAtTplusOne;
 
 void forbidden_binary_states(vector<vector<vector<int>>> & binaryFacts) {
     for (auto i=0; i<binaryFacts.size(); i++) {
-        if (binaryFacts[i].size()%2 != 0) {
+        if (__builtin_popcount(binaryFacts[i].size()) != 1) {
             int bits = sizeof(int)*8-__builtin_clz(binaryFacts[i].size());
             int nxtPowOfTwo = 2;
             for (int i=1; i<bits; i++) {nxtPowOfTwo *= 2;}
@@ -281,58 +281,6 @@ void sat_step_binary(TaskProxy task_proxy, sat_capsule & capsule) {
     }
     operatorVars.push_back(operatorsAtTnow);
     //cout << "Operator vars for next timestep: " << operatorVars << endl;
-}
-
-void output_plan_validate(TaskProxy task_proxy, sat_capsule & capsule, bool binary) {
-    cout << "Please enter the program call for an installed validator [default=validate]: ";
-    string validator = "validate";
-    string input_validator;
-    getline(cin, validator);
-    if (!input_validator.empty()) {
-        validator = input_validator;
-    }
-    string domain_file = "domain.pddl";
-    cout << "Please enter a problem file name: ";
-    string problem_file;
-    getline(cin, problem_file);
-    /*
-    char buff[FILENAME_MAX]; //create string buffer to hold path
-    getcwd(buff, FILENAME_MAX);
-    string current_working_dir(buff);
-    */
-    string plan_file = "found_plan";
-    if (binary) {
-        plan_file = "found_plan_binary";
-    }
-
-    int lit = capsule.number_of_variables;
-    if (ipasir_solve(solver) == 10){
-        int step_counter = 0;
-        ofstream output;
-        output.open(plan_file);
-        if (!output) {
-            cerr << "Error: File could not be opened" << endl;
-            exit(1);
-        }
-        for (int v = 1; v <= lit; v++) {
-            for (auto & it : operatorVars) {
-                for (auto i=0; i<it.size(); i++) {
-                    if (it[i] == v and ipasir_val(solver,v) > 0) {
-                        output << "(" <<task_proxy.get_operators()[i].get_name() << ")" << endl;
-                        step_counter++;
-                    }
-                }
-            }
-        }
-        output << "; cost = " << step_counter << " (unit cost)";
-        output.close();
-        string full_call = validator + " " + domain_file + " " + problem_file + " " + plan_file;
-        const char * cmd_call = full_call.c_str();
-        int call = system(cmd_call);
-        if (call == -1) {
-            cerr << "Error: Failed to call the validator!" << endl;
-        }
-    }
 }
 
 void sat_encoding(TaskProxy task_proxy, int steps) {

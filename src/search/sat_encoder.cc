@@ -86,10 +86,10 @@ void assertNot(void* solver, int i){
 }
 
 void assertOr(void* solver, std::vector<int> & i) {
-    std::cout << "Adding ";
+    /*std::cout << "Adding ";
     for (int & x : i)
         std::cout << x << " or ";
-    std::cout << "<-- ends before this or." << std::endl;
+    std::cout << "<-- ends before this or." << std::endl;*/
     for (int & x : i)
         ipasir_add(solver,x);
     ipasir_add(solver,0);
