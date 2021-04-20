@@ -493,10 +493,18 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
                         break;
                     }
                 }
-                if (!matchFound && binaryFactsAtTplusOne[effVar].size() == 2) {
+                if (!matchFound) {
                     // Add operator to downward flank vector of fact variable. Special case when the
-                    // effect doen't have a corresponding precondition in the operator.
-                    frameAxioms[effVar][1].push_back(operatorVar);
+                    // effect doesn't have a corresponding precondition in the operator.
+                    for (size_t i=0; i<binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value].size(); i++) {
+                        // Add operator to upward flank vector of fact variable i.
+                        if (binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i]>0) {
+                            frameAxioms[effVar][0+2*i].push_back(operatorVar);
+                        // Add operator to downward flank vector of fact variable i.
+                        } else if (binaryFactsAtTplusOne[effVar][effects.get_fact().get_pair().value][i]<0) {
+                            frameAxioms[effVar][1+2*i].push_back(operatorVar);
+                        }
+                    }
                 }
             }
         }
@@ -517,7 +525,7 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
         }
 
         // Add clauses such that exactly one operator can be picked per time step.
-        atLeastOne(solver, capsule, operatorVars[timeStep]);
+        //atLeastOne(solver, capsule, operatorVars[timeStep]);
         atMostOne(solver, capsule, operatorVars[timeStep]);
 
         // At the end of one step prepare the next time step, if it isn't the last.
@@ -551,10 +559,10 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     
     if (ipasir_solve(solver) == 10){
         found_plan(capsule.number_of_variables, task_proxy, solver, operatorVars, true);
-        /*
+        
         string validator = "validate";
         string domain_file = "domain.pddl";
-        string problem_file = "problem-p01.pddl";
+        string problem_file = "problem-p09.pddl";
         string plan_file = "found_plan_binary";
         string full_call = validator + " " + domain_file + " " + problem_file + " " + plan_file;
         const char * cmd_call = full_call.c_str();
@@ -564,7 +572,7 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
         } else {
             cerr << "ERROR: Calling validator failed!" << endl;
             return true;
-        }*/
+        }
     }
     // To make compiler shut up.
     return true;
