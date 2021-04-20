@@ -384,7 +384,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     if (ipasir_solve(solver) == 10){
         // Use plan_manager to save a found plan.
         found_plan(capsule.number_of_variables, task_proxy, solver, operatorVars, false);
-
+        /*
         string validator = "validate";
         string domain_file = "domain.pddl";
         string problem_file = "problem-p01.pddl";
@@ -397,7 +397,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
         } else {
             cerr << "ERROR: Calling validator failed!" << endl;
             return true;
-        }
+        }*/
     }
     // To make compiler shut up.
     return true;
@@ -489,6 +489,8 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
                                     frameAxioms[effVar][1+2*i].push_back(operatorVar);
                             }
                         }
+                        // After match is found there's no need to check for more matches.
+                        break;
                     }
                 }
                 if (!matchFound && binaryFactsAtTplusOne[effVar].size() == 2) {
@@ -549,7 +551,7 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     
     if (ipasir_solve(solver) == 10){
         found_plan(capsule.number_of_variables, task_proxy, solver, operatorVars, true);
-    
+        /*
         string validator = "validate";
         string domain_file = "domain.pddl";
         string problem_file = "problem-p01.pddl";
@@ -562,7 +564,7 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
         } else {
             cerr << "ERROR: Calling validator failed!" << endl;
             return true;
-        }
+        }*/
     }
     // To make compiler shut up.
     return true;

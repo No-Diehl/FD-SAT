@@ -21,6 +21,8 @@ int main(int argc, const char **argv) {
     // sat::sat_solver_call();
     // return(0);
     utils::register_event_handlers();
+    cout << "Argument0 is: " << argv[0] << endl;
+    cout << "Argument1 is: " << argv[1] << endl;
 
     if (argc < 2) {
         utils::g_log << usage(argv[0]) << endl;
@@ -50,7 +52,9 @@ int main(int argc, const char **argv) {
 
     // <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@>
     // End planner here for testing purposes.
-    return(0);
+    ExitCode exitcd = ExitCode::SUCCESS;
+    utils::report_exit_code_reentrant(exitcd);
+    return static_cast<int>(exitcd);
     // <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@>
 
     shared_ptr<SearchEngine> engine;
