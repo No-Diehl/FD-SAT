@@ -578,4 +578,28 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     return true;
 }
 
+bool sat_forall(TaskProxy task_proxy,
+                sat_capsule & capsule,
+                vector<vector<int>> & factsAtTnow,
+                vector<vector<int>> & factsAtTplusOne,
+                vector<vector<int>> & operatorVars) {
+    
+    // Create a 4D vector based on the 2D structure of the fact vectors
+    // to store operators erasing/requiring a specific fact (state variable).
+    vector<vector<vector<vector<int>>>> eraseRequire;
+
+    /* TODO: GO through all operators and place them in all the relevant
+       erase and require vectors. Require is staight forward: Check precond.
+       and put them into the corresponding require vector.
+       Erase is tricky because of the mutex property of SAS+ fact groups.
+       Idea: Check mutex group of effects, look for corresponding group
+       in precond. and put the operator in erase vector of that precond.
+       fact. If no precond. of the same group is found, put the operator
+       in all erase vectors of all facts of that mutex group except for
+       the one I found in effects.
+    */
+
+
+}
+
 }
