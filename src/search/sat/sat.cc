@@ -274,6 +274,11 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     int operator_limit = 0;
 
     for (int timeStep=0; timeStep<steps; timeStep++) {
+        // Testing forall encoding preparations.
+        if (timeStep == 0) {
+            sat_forall(task_proxy, capsule, factsAtTnow, operatorVars);
+        }
+
         int curr_clauses;
         if (timeStep == 0) {
             curr_clauses = get_number_of_clauses();
@@ -578,17 +583,33 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     return true;
 }
 
-bool sat_forall(TaskProxy task_proxy,
+void sat_forall(TaskProxy task_proxy,
                 sat_capsule & capsule,
                 vector<vector<int>> & factsAtTnow,
-                vector<vector<int>> & factsAtTplusOne,
                 vector<vector<int>> & operatorVars) {
     
-    // Create a 4D vector based on the 2D structure of the fact vectors
-    // to store operators erasing/requiring a specific fact (state variable).
+    /*
+    Using a 4D vector based on the 2D structure of the fact vectors
+    to store operators erasing/requiring a specific fact (state variable).
+    */
     vector<vector<vector<vector<int>>>> eraseRequire;
 
-    /* TODO: GO through all operators and place them in all the relevant
+    // Create the structure of the eraseRequire 4D vector.
+    for (size_t i=0; i<factsAtTnow.size(); i++) {
+        vector<vector<vector<int>>> mutexGroup;
+        for (size_t j=0; j<factsAtTnow[i].size(); j++) {
+            vector<vector<int>> factVec;
+            vector<int> eraseVec;
+            vector<int> requireVec;
+            factVec.push_back(eraseVec);
+            factVec.push_back(requireVec);
+            mutexGroup.push_back(factVec);
+        }
+        eraseRequire.push_back(mutexGroup);
+    }
+
+    /*
+       TODO: Go through all operators and place them in all the relevant
        erase and require vectors. Require is staight forward: Check precond.
        and put them into the corresponding require vector.
        Erase is tricky because of the mutex property of SAS+ fact groups.
@@ -598,7 +619,39 @@ bool sat_forall(TaskProxy task_proxy,
        in all erase vectors of all facts of that mutex group except for
        the one I found in effects.
     */
-
+    for (OperatorProxy const & operators : task_proxy.get_operators()) {
+        int operatorVar = operators.get_id();
+        // Check effects for a corresponding precondition that it erases and
+        // add the operator ID to the erase vector of that precondition.
+        for (EffectProxy const & effects : operators.get_effects()) {
+            int effVar = effects.get_fact().get_pair().var;
+            bool matchFound = false;
+            for (FactProxy const & preconditions : operators.get_preconditions()) {
+                if (preconditions.get_pair().var == effVar) {
+                    matchFound = true;
+                    // Add operator to erase vector of this precondition.
+                    eraseRequire[effVar][preconditions.get_pair().value][0].push_back(operatorVar);
+                    break;
+                }
+            }
+            // If no corresponding precondition is found, add the operator ID
+            // to all erase vectors of the possible preconditions, except for
+            // the fact that becomes true through the operator's effect.
+            if(!matchFound) {
+                for (size_t i=0; i<eraseRequire[effVar].size(); i++) {
+                    if (i != effects.get_fact().get_pair().value) {
+                        eraseRequire[effVar][i][0].push_back(operatorVar);
+                    }
+                }
+            }
+        }
+        // Go through preconditions and add operator ID to all require vectors
+        // of the corresponding preconditions.
+        for (FactProxy const & preconditions : operators.get_preconditions()) {
+            eraseRequire[preconditions.get_pair().var][preconditions.get_pair().value][1].push_back(operatorVar);
+        }
+    }
+    cout << "These are the Em/Rm:\n" << eraseRequire << endl;
 
 }
 

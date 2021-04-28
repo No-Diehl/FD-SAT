@@ -32,10 +32,9 @@ void found_plan(int vars,
                 bool binary);
 bool sat_encoding(TaskProxy task_proxy, int steps);
 bool sat_encoding_binary(TaskProxy task_proxy, int steps);
-bool sat_forall(TaskProxy task_proxy,
+void sat_forall(TaskProxy task_proxy,
                 sat_capsule & capsule,
                 vector<vector<int>> & factsAtTnow,
-                vector<vector<int>> & factsAtTplusOne,
                 vector<vector<int>> & operatorVars);
 }
 #endif
