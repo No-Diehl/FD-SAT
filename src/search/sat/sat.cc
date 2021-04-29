@@ -287,6 +287,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     int operator_limit = 0;
 
     for (int timeStep=0; timeStep<steps; timeStep++) {
+        cout << "TIMESTEP IS: " << timeStep << endl;
         // Testing forall encoding preparations.
         if (timeStep == 0 && !satForallExecuted) {
             sat_forall(task_proxy, factsAtTnow);
@@ -362,7 +363,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
         for (size_t i=0; i<chains.size(); i++) {
             for (size_t j=0; j<chains[i].size(); j++) {
                 vector<int> auxVars;
-                for (size_t k=0; k<requireSizes[i][j][0][0]; k++) {
+                for (int k=0; k<requireSizes[i][j][0][0]; k++) {
                     auxVars.push_back(capsule.new_variable());
                 }
                 for (size_t k=0; k<chains[i][j].size(); k++) {
@@ -394,7 +395,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
         for (size_t i=0; i<chainsBackwards.size(); i++) {
             for (size_t j=0; j<chainsBackwards[i].size(); j++) {
                 vector<int> auxVars;
-                for (size_t k=0; k<requireSizes[i][j][0][0]; k++) {
+                for (int k=0; k<requireSizes[i][j][0][0]; k++) {
                     auxVars.push_back(capsule.new_variable());
                 }
                 for (size_t k=0; k<chainsBackwards[i][j].size(); k++) {
@@ -423,6 +424,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
                 }
             }
         }
+        cout << "LAST FORALL_STEP CLAUSE ADDED!" << endl;
 
         if (timeStep == 0) {
             operator_limit = get_number_of_clauses()-curr_clauses;
