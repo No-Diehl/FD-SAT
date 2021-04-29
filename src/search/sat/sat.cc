@@ -593,10 +593,16 @@ void sat_forall(TaskProxy task_proxy,
     to store operators erasing/requiring a specific fact (state variable).
     */
     vector<vector<vector<vector<int>>>> eraseRequire;
+    /*
+    Using a 4D vector based on the 2D structure of the fact vectors
+    to store results of the three parts of the chain search.
+    */
+    vector<vector<vector<vector<pair<int,int>>>>> chains;
 
-    // Create the structure of the eraseRequire 4D vector.
+    // Create the structure of the eraseRequire and chains 4D vectors.
     for (size_t i=0; i<factsAtTnow.size(); i++) {
         vector<vector<vector<int>>> mutexGroup;
+        vector<vector<vector<pair<int,int>>>> chainGroup;
         for (size_t j=0; j<factsAtTnow[i].size(); j++) {
             vector<vector<int>> factVec;
             vector<int> eraseVec;
@@ -604,21 +610,19 @@ void sat_forall(TaskProxy task_proxy,
             factVec.push_back(eraseVec);
             factVec.push_back(requireVec);
             mutexGroup.push_back(factVec);
+            vector<vector<pair<int,int>>> chainVec;
+            vector<pair<int,int>> chainStart;
+            vector<pair<int,int>> chainIntersect;
+            vector<pair<int,int>> chainEnd;
+            chainVec.push_back(chainStart);
+            chainVec.push_back(chainIntersect);
+            chainVec.push_back(chainEnd);
+            chainGroup.push_back(chainVec);
         }
         eraseRequire.push_back(mutexGroup);
+        chains.push_back(chainGroup);
     }
 
-    /*
-       TODO: Go through all operators and place them in all the relevant
-       erase and require vectors. Require is staight forward: Check precond.
-       and put them into the corresponding require vector.
-       Erase is tricky because of the mutex property of SAS+ fact groups.
-       Idea: Check mutex group of effects, look for corresponding group
-       in precond. and put the operator in erase vector of that precond.
-       fact. If no precond. of the same group is found, put the operator
-       in all erase vectors of all facts of that mutex group except for
-       the one I found in effects.
-    */
     for (OperatorProxy const & operators : task_proxy.get_operators()) {
         int operatorVar = operators.get_id();
         // Check effects for a corresponding precondition that it erases and
@@ -651,7 +655,84 @@ void sat_forall(TaskProxy task_proxy,
             eraseRequire[preconditions.get_pair().var][preconditions.get_pair().value][1].push_back(operatorVar);
         }
     }
-    cout << "These are the Em/Rm:\n" << eraseRequire << endl;
+
+    /*
+    Starting the chain search which consists of four parts:
+    1. Chain starters
+    2. Chain intersections
+    3. Chain ends
+    4. Clean-up unneeded intersections and ends
+    */
+    for (size_t i=0; i<eraseRequire.size(); i++) {
+        for (size_t j=0; j<eraseRequire[i].size(); j++) {
+            // 1. Chain starters
+            // Iterating through erase vector (index = 0).
+            size_t firstIndex = 0;
+            for (size_t k=0; k<eraseRequire[i][j][0].size(); k++) {
+                // Iterating through require vector (index = 1).
+                for (size_t l=firstIndex; l<eraseRequire[i][j][1].size(); l++) {
+                    if (eraseRequire[i][j][0][k]<eraseRequire[i][j][1][l]) {
+                        int start = eraseRequire[i][j][0][k]+1;
+                        int end = eraseRequire[i][j][1][l]-1;
+                        bool emptyIntersection = true;
+                        for (int m=start; m<=end; m++) {
+                            for (size_t n=0; n<eraseRequire[i][j][1].size(); n++) {
+                                if (m == eraseRequire[i][j][1][n]) {
+                                    emptyIntersection = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (emptyIntersection) {
+                            // Create rule o^i_t -> a^j,m_t. a^j,m_t = o^j_t for now and must later be replaced.
+                            pair<int,int> chainStarter (eraseRequire[i][j][0][k],eraseRequire[i][j][1][l]);
+                            // Add rule pair to chainStarter vector (index = 0) in chains.
+                            chains[i][j][0].push_back(chainStarter);
+                        }
+                    } else {
+                        firstIndex = l+1;
+                    }
+                }
+            }
+            // 2. Chain intersections
+            // Iterating through require vector (index = 1).
+            size_t firstIndInter = 0;
+            for (size_t k=0; k<eraseRequire[i][j][1].size(); k++) {
+                for (size_t l=firstIndInter; l<eraseRequire[i][j][1].size(); l++) {
+                    if (eraseRequire[i][j][1][k]<eraseRequire[i][j][1][l]) {
+                        int start = eraseRequire[i][j][1][k]+1;
+                        int end = eraseRequire[i][j][1][l]-1;
+                        bool emptyIntersection = true;
+                        for (int m=start; m<=end; m++) {
+                            for (size_t n=0; n<eraseRequire[i][j][1].size(); n++) {
+                                if (m == eraseRequire[i][j][1][n]) {
+                                    emptyIntersection = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (emptyIntersection) {
+                            // Create rule a^i,m_t -> a^j,m_t. Both variables are their respective
+                            // operator variables for now and must later be replaced.
+                            pair<int,int> chainIntersect (eraseRequire[i][j][1][k],eraseRequire[i][j][1][l]);
+                            // Add rule pair to chainIntersect vector (index = 1).
+                            chains[i][j][1].push_back(chainIntersect);
+                        }
+                    } else {
+                        firstIndInter = l+1;
+                    }                    
+                }
+            }
+            // 3. Chain ends
+            // Iterating through require vector (index = 1).
+            for (size_t k=0; k<eraseRequire[i][j][1].size(); k++) {
+                // Create rule a^i,m_t -> -o^i_t. a^i,m_t = o^i_t for now and must later be replaced.
+                pair<int,int> chainEnd (eraseRequire[i][j][1][k],-eraseRequire[i][j][1][k]);
+                // Add rule pair to chainEnd vector (index = 2).
+                chains[i][j][2].push_back(chainEnd);
+            }
+        }
+    }
 
 }
 
