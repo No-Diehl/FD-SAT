@@ -276,7 +276,8 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     for (int timeStep=0; timeStep<steps; timeStep++) {
         // Testing forall encoding preparations.
         if (timeStep == 0) {
-            sat_forall(task_proxy, capsule, factsAtTnow, operatorVars);
+            cout << "Entering sat_forall function" << endl;
+            sat_forall(task_proxy, factsAtTnow);
         }
 
         int curr_clauses;
@@ -590,12 +591,10 @@ Using two 4D vectors based on the 2D structure of the fact
 vector<vector<vector<vector<pair<int,int>>>>> chains;
 vector<vector<vector<vector<pair<int,int>>>>> chainsBackwards;
 // Storing the sizes of the erase and require vectors.
-vector<vector<vector<vector<int>>>> eraseRequireSizes;
+vector<vector<vector<vector<int>>>> requireSizes;
 
 void sat_forall(TaskProxy task_proxy,
-                sat_capsule & capsule,
-                vector<vector<int>> & factsAtTnow,
-                vector<vector<int>> & operatorVars) {
+                vector<vector<int>> & factsAtTnow) {
     
     /*
     Using a 4D vector based on the 2D structure of the fact vectors
@@ -603,9 +602,12 @@ void sat_forall(TaskProxy task_proxy,
     */
     vector<vector<vector<vector<int>>>> eraseRequire;
 
-    // Create the structure of the eraseRequire and chains 4D vectors.
+    vector<vector<vector<vector<int>>>> requireSizesTemp;
+
+    // Create the structure of the eraseRequire, requireSizesTemp and chains 4D vectors.
     for (size_t i=0; i<factsAtTnow.size(); i++) {
         vector<vector<vector<int>>> mutexGroup;
+        vector<vector<vector<int>>> mutexReqSize;
         vector<vector<vector<pair<int,int>>>> chainGroup;
         for (size_t j=0; j<factsAtTnow[i].size(); j++) {
             vector<vector<int>> factVec;
@@ -614,6 +616,10 @@ void sat_forall(TaskProxy task_proxy,
             factVec.push_back(eraseVec);
             factVec.push_back(requireVec);
             mutexGroup.push_back(factVec);
+            vector<vector<int>> factReqSize;
+            vector<int> requireSize;
+            factReqSize.push_back(requireSize);
+            mutexReqSize.push_back(factReqSize);
             vector<vector<pair<int,int>>> chainVec;
             vector<pair<int,int>> chainStart;
             vector<pair<int,int>> chainIntersect;
@@ -624,8 +630,10 @@ void sat_forall(TaskProxy task_proxy,
             chainGroup.push_back(chainVec);
         }
         eraseRequire.push_back(mutexGroup);
+        requireSizesTemp.push_back(mutexReqSize);
         chains.push_back(chainGroup);
     }
+
     // Copy of the empty construct of chains.
     chainsBackwards = chains;
     // Copy of the empty construct of eraseRequire.
@@ -651,7 +659,7 @@ void sat_forall(TaskProxy task_proxy,
             // the fact that becomes true through the operator's effect.
             if(!matchFound) {
                 for (size_t i=0; i<eraseRequire[effVar].size(); i++) {
-                    if (i != effects.get_fact().get_pair().value) {
+                    if (i != (size_t)effects.get_fact().get_pair().value) {
                         eraseRequire[effVar][i][0].push_back(operatorVar);
                     }
                 }
@@ -664,45 +672,32 @@ void sat_forall(TaskProxy task_proxy,
         }
     }
 
-    // Fill eraseRequireSizes with the sizes of their respective vectors.
-    for (size_t i=0; i<eraseRequire.size(); i++) {
-        for (size_t j=0; j<eraseRequire[i].size(); j++) {
-            eraseRequireSizes[i][j][0].push_back(eraseRequire[i][j][0].size());
-            eraseRequireSizes[i][j][1].push_back(eraseRequire[i][j][1].size());
+    // Fill requireSizes with the sizes of their respective vectors.
+    for (size_t i=0; i<requireSizesTemp.size(); i++) {
+        for (size_t j=0; j<requireSizesTemp[i].size(); j++) {
+            //requireSizes[i][j][0].push_back(eraseRequire[i][j][0].size());
+            requireSizesTemp[i][j][0].push_back(eraseRequire[i][j][1].size());
         }
     }
-
+    requireSizes = requireSizesTemp;
+    
     // Construct eraseRequireReversed from eraseRequire.
     for (size_t i=0; i<eraseRequire.size(); i++) {
         for (size_t j=0; j<eraseRequire[i].size(); j++) {
-            for (size_t k=eraseRequire[i][j][0].size()-1; k>=0; k++) {
-                eraseRequireReversed[i][j][0].push_back(-eraseRequire[i][j][0][k]);
+            for (size_t k=eraseRequire[i][j][0].size(); k>0; k--) {
+                eraseRequireReversed[i][j][0].push_back(-eraseRequire[i][j][0][k-1]);
             }
-            for (size_t l=eraseRequire[i][j][1].size()-1; l>=0; l++) {
-                eraseRequireReversed[i][j][1].push_back(-eraseRequire[i][j][0][l]);
+            for (size_t l=eraseRequire[i][j][1].size(); l>0; l--) {
+                eraseRequireReversed[i][j][1].push_back(-eraseRequire[i][j][0][l-1]);
             }
         }
     }
 
     forall_chains(eraseRequire, false);
     forall_chains(eraseRequireReversed, true);
-    // Debugging chains.
-    cout << "Chains are:\n";
-    for (size_t i=0; i<chains.size(); i++) {
-        cout << "[";
-        for (size_t j=0; j<chains[i].size(); j++) {
-            cout << "[";
-            for (size_t k=0; k<chains[i][j].size(); k++) {
-                cout << "[";
-                for (size_t l=0; l<chains[i][j][k].size(); l++) {
-                    cout << "(" << chains[i][j][k][l].first << "," << chains[i][j][k][l].second << "), ";
-                }
-                cout << "]";
-            }
-            cout << "]";
-        }
-        cout << "]" << endl;
-    }
+    cout << "Chain rule in chains[0][0][0][1] is: (op" << chains[0][0][0][1].first << ",a" << chains[0][0][0][1].second << ")" << endl;
+    cout << "Size of require vector of chains[0][0][0] is: " << requireSizes[0][0][0][0] << endl;
+    cout << "Require sizes are:\n" << requireSizes << endl;
 }
 
 void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
@@ -718,6 +713,10 @@ void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
             // Iterating through erase vector (index = 0).
             size_t firstIndex = 0;
             for (size_t k=0; k<eR[i][j][0].size(); k++) {
+                // Edge case: Require vector is empty
+                if (eR[i][j][1].size()<=0) {
+                    continue;
+                }
                 // Iterating through require vector (index = 1).
                 for (size_t l=firstIndex; l<eR[i][j][1].size(); l++) {
                     if (eR[i][j][0][k]<eR[i][j][1][l]) {
@@ -727,16 +726,22 @@ void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
                             pair<int,int> chainStarter (eR[i][j][0][k],l);
                             // Add rule pair to chainStarter vector (index = 0) in chains.
                             chains[i][j][0].push_back(chainStarter);
+                            cout << "Added starter rule to chains: (op" << eR[i][j][0][k] << ",a" << l << ")" << endl; 
                             break;
                         } else {
                             pair<int,int> chainStarter (-eR[i][j][0][k],l);
                             chainsBackwards[i][j][0].push_back(chainStarter);
+                            cout << "Added starter rule to chainsBackwards: (op" << -eR[i][j][0][k] << ",a" << l << ")" << endl;
                             break;
                         }
                     } else {
                         firstIndex = l+1;
                     }
                 }
+            }
+            // Edge case: Require vector is empty
+            if (eR[i][j][1].size()<=0) {
+                continue;
             }
             // Iterating through require vector (index = 1).
             for (size_t k=0; k<eR[i][j][1].size()-1; k++) {
@@ -748,8 +753,10 @@ void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
                     if (!reversed) {
                         // Add rule pair to chainIntersect vector (index = 1).
                         chains[i][j][1].push_back(chainIntersect);
+                        cout << "Added intersect rule to chains: (a" << k << ",a" << k+1 << ")" << endl;
                     } else {
                         chainsBackwards[i][j][1].push_back(chainIntersect);
+                        cout << "Added intersect rule to chainsBackwards: (a" << k << ",a" << k+1 << ")" << endl;
                     }                    
 
                     if (!reversed) {
@@ -759,23 +766,28 @@ void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
                         pair<int,int> chainEnd (k,-eR[i][j][1][k]);
                         // Add rule pair to chainEnd vector (index = 2).
                         chains[i][j][2].push_back(chainEnd);
+                        cout << "Added end rule to chains: (a" << k << ",-op" << eR[i][j][1][k] << ")" << endl;
                     } else {
                         pair<int,int> chainEnd (k,eR[i][j][1][k]);
                         chainsBackwards[i][j][2].push_back(chainEnd);
+                        cout << "Added end rule to chainsBackwards: (a" << k << ",-op" << -eR[i][j][1][k] << ")" << endl;
                     }                    
                 }
             }
-            if (!reversed) {
-                // End rule for last element of require vector, bc for loop ends one index early.
-                pair<int,int> chainEnd ((int)eR[i][j][1].size(),-eR[i][j][1][-1]);
-                chains[i][j][2].push_back(chainEnd);
-            } else {
-                pair<int,int> chainEnd ((int)eR[i][j][1].size(),eR[i][j][1][-1]);
-                chainsBackwards[i][j][2].push_back(chainEnd);
-            }            
+            if (eR[i][j][1][eR[i][j][1].size()-1]>eR[i][j][0][0]) {
+                if (!reversed) {
+                    // End rule for last element of require vector, bc for loop ends one index early.
+                    pair<int,int> chainEnd ((int)eR[i][j][1].size()-1,-eR[i][j][1][eR[i][j][1].size()-1]);
+                    chains[i][j][2].push_back(chainEnd);
+                    cout << "Added final end rule to chains: (a" << eR[i][j][1].size()-1 << ",-op" << eR[i][j][1][eR[i][j][1].size()-1] << ")" << endl;
+                } else {
+                    pair<int,int> chainEnd ((int)eR[i][j][1].size(),eR[i][j][1][eR[i][j][1].size()-1]);
+                    chainsBackwards[i][j][2].push_back(chainEnd);
+                    cout << "Added final end rule to chainsBackwards: (a" << eR[i][j][1].size()-1 << ",-op" << -eR[i][j][1][eR[i][j][1].size()-1] << ")" << endl;
+                }
+            }
         }
     }
-
 }
 
 }
