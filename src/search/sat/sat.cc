@@ -583,6 +583,15 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     return true;
 }
 
+/*
+Using two 4D vectors based on the 2D structure of the fact
+ ectors to store results of the three parts of the chain search.
+*/
+vector<vector<vector<vector<pair<int,int>>>>> chains;
+vector<vector<vector<vector<pair<int,int>>>>> chainsBackwards;
+// Storing the sizes of the erase and require vectors.
+vector<vector<vector<vector<int>>>> eraseRequireSizes;
+
 void sat_forall(TaskProxy task_proxy,
                 sat_capsule & capsule,
                 vector<vector<int>> & factsAtTnow,
@@ -593,11 +602,6 @@ void sat_forall(TaskProxy task_proxy,
     to store operators erasing/requiring a specific fact (state variable).
     */
     vector<vector<vector<vector<int>>>> eraseRequire;
-    /*
-    Using a 4D vector based on the 2D structure of the fact vectors
-    to store results of the three parts of the chain search.
-    */
-    vector<vector<vector<vector<pair<int,int>>>>> chains;
 
     // Create the structure of the eraseRequire and chains 4D vectors.
     for (size_t i=0; i<factsAtTnow.size(); i++) {
@@ -622,6 +626,10 @@ void sat_forall(TaskProxy task_proxy,
         eraseRequire.push_back(mutexGroup);
         chains.push_back(chainGroup);
     }
+    // Copy of the empty construct of chains.
+    chainsBackwards = chains;
+    // Copy of the empty construct of eraseRequire.
+    vector<vector<vector<vector<int>>>> eraseRequireReversed = eraseRequire;
 
     for (OperatorProxy const & operators : task_proxy.get_operators()) {
         int operatorVar = operators.get_id();
@@ -656,86 +664,117 @@ void sat_forall(TaskProxy task_proxy,
         }
     }
 
+    // Fill eraseRequireSizes with the sizes of their respective vectors.
+    for (size_t i=0; i<eraseRequire.size(); i++) {
+        for (size_t j=0; j<eraseRequire[i].size(); j++) {
+            eraseRequireSizes[i][j][0].push_back(eraseRequire[i][j][0].size());
+            eraseRequireSizes[i][j][1].push_back(eraseRequire[i][j][1].size());
+        }
+    }
+
+    // Construct eraseRequireReversed from eraseRequire.
+    for (size_t i=0; i<eraseRequire.size(); i++) {
+        for (size_t j=0; j<eraseRequire[i].size(); j++) {
+            for (size_t k=eraseRequire[i][j][0].size()-1; k>=0; k++) {
+                eraseRequireReversed[i][j][0].push_back(-eraseRequire[i][j][0][k]);
+            }
+            for (size_t l=eraseRequire[i][j][1].size()-1; l>=0; l++) {
+                eraseRequireReversed[i][j][1].push_back(-eraseRequire[i][j][0][l]);
+            }
+        }
+    }
+
+    forall_chains(eraseRequire, false);
+    forall_chains(eraseRequireReversed, true);
+    // Debugging chains.
+    cout << "Chains are:\n";
+    for (size_t i=0; i<chains.size(); i++) {
+        cout << "[";
+        for (size_t j=0; j<chains[i].size(); j++) {
+            cout << "[";
+            for (size_t k=0; k<chains[i][j].size(); k++) {
+                cout << "[";
+                for (size_t l=0; l<chains[i][j][k].size(); l++) {
+                    cout << "(" << chains[i][j][k][l].first << "," << chains[i][j][k][l].second << "), ";
+                }
+                cout << "]";
+            }
+            cout << "]";
+        }
+        cout << "]" << endl;
+    }
+}
+
+void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
     /*
-    Starting the chain search which consists of four parts:
+    Starting the chain search which consists of three parts:
     1. Chain starters
     2. Chain intersections
     3. Chain ends
-    4. Clean-up unneeded intersections and ends
     */
-    for (size_t i=0; i<eraseRequire.size(); i++) {
-        for (size_t j=0; j<eraseRequire[i].size(); j++) {
+    for (size_t i=0; i<eR.size(); i++) {
+        for (size_t j=0; j<eR[i].size(); j++) {
             // 1. Chain starters
             // Iterating through erase vector (index = 0).
             size_t firstIndex = 0;
-            for (size_t k=0; k<eraseRequire[i][j][0].size(); k++) {
+            for (size_t k=0; k<eR[i][j][0].size(); k++) {
                 // Iterating through require vector (index = 1).
-                for (size_t l=firstIndex; l<eraseRequire[i][j][1].size(); l++) {
-                    if (eraseRequire[i][j][0][k]<eraseRequire[i][j][1][l]) {
-                        int start = eraseRequire[i][j][0][k]+1;
-                        int end = eraseRequire[i][j][1][l]-1;
-                        bool emptyIntersection = true;
-                        for (int m=start; m<=end; m++) {
-                            for (size_t n=0; n<eraseRequire[i][j][1].size(); n++) {
-                                if (m == eraseRequire[i][j][1][n]) {
-                                    emptyIntersection = false;
-                                    break;
-                                }
-                            }
-                        }
-                        if (emptyIntersection) {
-                            // Create rule o^i_t -> a^j,m_t. a^j,m_t = o^j_t for now and must later be replaced.
-                            pair<int,int> chainStarter (eraseRequire[i][j][0][k],eraseRequire[i][j][1][l]);
+                for (size_t l=firstIndex; l<eR[i][j][1].size(); l++) {
+                    if (eR[i][j][0][k]<eR[i][j][1][l]) {
+                        if (!reversed) {
+                            // Create rule o^i_t -> a^j,m_t. a^j,m_t represents it's position (index)
+                            // inside the require vector. Will be used for replacement with aux var.
+                            pair<int,int> chainStarter (eR[i][j][0][k],l);
                             // Add rule pair to chainStarter vector (index = 0) in chains.
                             chains[i][j][0].push_back(chainStarter);
+                            break;
+                        } else {
+                            pair<int,int> chainStarter (-eR[i][j][0][k],l);
+                            chainsBackwards[i][j][0].push_back(chainStarter);
+                            break;
                         }
                     } else {
                         firstIndex = l+1;
                     }
                 }
             }
-            // 2. Chain intersections
             // Iterating through require vector (index = 1).
-            size_t firstIndInter = 0;
-            for (size_t k=0; k<eraseRequire[i][j][1].size(); k++) {
-                for (size_t l=firstIndInter; l<eraseRequire[i][j][1].size(); l++) {
-                    if (eraseRequire[i][j][1][k]<eraseRequire[i][j][1][l]) {
-                        int start = eraseRequire[i][j][1][k]+1;
-                        int end = eraseRequire[i][j][1][l]-1;
-                        bool emptyIntersection = true;
-                        for (int m=start; m<=end; m++) {
-                            for (size_t n=0; n<eraseRequire[i][j][1].size(); n++) {
-                                if (m == eraseRequire[i][j][1][n]) {
-                                    emptyIntersection = false;
-                                    break;
-                                }
-                            }
-                        }
-                        if (emptyIntersection) {
-                            // Create rule a^i,m_t -> a^j,m_t. Both variables are their respective
-                            // operator variables for now and must later be replaced.
-                            pair<int,int> chainIntersect (eraseRequire[i][j][1][k],eraseRequire[i][j][1][l]);
-                            // Add rule pair to chainIntersect vector (index = 1).
-                            chains[i][j][1].push_back(chainIntersect);
-                        }
+            for (size_t k=0; k<eR[i][j][1].size()-1; k++) {
+                if (eR[i][j][1][k]>eR[i][j][0][0]) {
+                    // 2. Chain intersections
+                    // Create rule a^i,m_t -> a^j,m_t. Variables represent their position (index)
+                    // inside their require vector. Will be used for replacement with aux var.
+                    pair<int,int> chainIntersect (k,k+1);
+                    if (!reversed) {
+                        // Add rule pair to chainIntersect vector (index = 1).
+                        chains[i][j][1].push_back(chainIntersect);
                     } else {
-                        firstIndInter = l+1;
+                        chainsBackwards[i][j][1].push_back(chainIntersect);
+                    }                    
+
+                    if (!reversed) {
+                        // 3. Chain ends
+                        // Create rule a^i,m_t -> -o^i_t. a^i,m_t represents it's position (index)
+                        // inside the require vector. Will be used for replacement with aux var.
+                        pair<int,int> chainEnd (k,-eR[i][j][1][k]);
+                        // Add rule pair to chainEnd vector (index = 2).
+                        chains[i][j][2].push_back(chainEnd);
+                    } else {
+                        pair<int,int> chainEnd (k,eR[i][j][1][k]);
+                        chainsBackwards[i][j][2].push_back(chainEnd);
                     }                    
                 }
             }
-            // 3. Chain ends
-            // Iterating through require vector (index = 1).
-            for (size_t k=0; k<eraseRequire[i][j][1].size(); k++) {
-                // Create rule a^i,m_t -> -o^i_t. a^i,m_t = o^i_t for now and must later be replaced.
-                pair<int,int> chainEnd (eraseRequire[i][j][1][k],-eraseRequire[i][j][1][k]);
-                // Add rule pair to chainEnd vector (index = 2).
+            if (!reversed) {
+                // End rule for last element of require vector, bc for loop ends one index early.
+                pair<int,int> chainEnd ((int)eR[i][j][1].size(),-eR[i][j][1][-1]);
                 chains[i][j][2].push_back(chainEnd);
-            }
+            } else {
+                pair<int,int> chainEnd ((int)eR[i][j][1].size(),eR[i][j][1][-1]);
+                chainsBackwards[i][j][2].push_back(chainEnd);
+            }            
         }
     }
-    // 4. Clean-up
-    // TODO: Remove unneeded chain intersections (implying var has no match in chainStarter implications)
-    // Remove unneeded chain ends (same check as above, I think)
 
 }
 

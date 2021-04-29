@@ -36,5 +36,6 @@ void sat_forall(TaskProxy task_proxy,
                 sat_capsule & capsule,
                 vector<vector<int>> & factsAtTnow,
                 vector<vector<int>> & operatorVars);
+void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed);
 }
 #endif
