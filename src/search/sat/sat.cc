@@ -733,6 +733,9 @@ void sat_forall(TaskProxy task_proxy,
             }
         }
     }
+    // 4. Clean-up
+    // TODO: Remove unneeded chain intersections (implying var has no match in chainStarter implications)
+    // Remove unneeded chain ends (same check as above, I think)
 
 }
 
