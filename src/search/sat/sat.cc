@@ -695,9 +695,6 @@ void sat_forall(TaskProxy task_proxy,
 
     forall_chains(eraseRequire, false);
     forall_chains(eraseRequireReversed, true);
-    cout << "Chain rule in chains[0][0][0][1] is: (op" << chains[0][0][0][1].first << ",a" << chains[0][0][0][1].second << ")" << endl;
-    cout << "Size of require vector of chains[0][0][0] is: " << requireSizes[0][0][0][0] << endl;
-    cout << "Require sizes are:\n" << requireSizes << endl;
 }
 
 void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
@@ -726,12 +723,12 @@ void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
                             pair<int,int> chainStarter (eR[i][j][0][k],l);
                             // Add rule pair to chainStarter vector (index = 0) in chains.
                             chains[i][j][0].push_back(chainStarter);
-                            cout << "Added starter rule to chains: (op" << eR[i][j][0][k] << ",a" << l << ")" << endl; 
+                            //cout << "Added starter rule to chains: (op" << eR[i][j][0][k] << ",a" << l << ")" << endl; 
                             break;
                         } else {
                             pair<int,int> chainStarter (-eR[i][j][0][k],l);
                             chainsBackwards[i][j][0].push_back(chainStarter);
-                            cout << "Added starter rule to chainsBackwards: (op" << -eR[i][j][0][k] << ",a" << l << ")" << endl;
+                            //cout << "Added starter rule to chainsBackwards: (op" << -eR[i][j][0][k] << ",a" << l << ")" << endl;
                             break;
                         }
                     } else {
@@ -753,10 +750,10 @@ void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
                     if (!reversed) {
                         // Add rule pair to chainIntersect vector (index = 1).
                         chains[i][j][1].push_back(chainIntersect);
-                        cout << "Added intersect rule to chains: (a" << k << ",a" << k+1 << ")" << endl;
+                        //cout << "Added intersect rule to chains: (a" << k << ",a" << k+1 << ")" << endl;
                     } else {
                         chainsBackwards[i][j][1].push_back(chainIntersect);
-                        cout << "Added intersect rule to chainsBackwards: (a" << k << ",a" << k+1 << ")" << endl;
+                        //cout << "Added intersect rule to chainsBackwards: (a" << k << ",a" << k+1 << ")" << endl;
                     }                    
 
                     if (!reversed) {
@@ -766,11 +763,11 @@ void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
                         pair<int,int> chainEnd (k,-eR[i][j][1][k]);
                         // Add rule pair to chainEnd vector (index = 2).
                         chains[i][j][2].push_back(chainEnd);
-                        cout << "Added end rule to chains: (a" << k << ",-op" << eR[i][j][1][k] << ")" << endl;
+                        //cout << "Added end rule to chains: (a" << k << ",-op" << eR[i][j][1][k] << ")" << endl;
                     } else {
                         pair<int,int> chainEnd (k,eR[i][j][1][k]);
                         chainsBackwards[i][j][2].push_back(chainEnd);
-                        cout << "Added end rule to chainsBackwards: (a" << k << ",-op" << -eR[i][j][1][k] << ")" << endl;
+                        //cout << "Added end rule to chainsBackwards: (a" << k << ",-op" << -eR[i][j][1][k] << ")" << endl;
                     }                    
                 }
             }
@@ -779,11 +776,11 @@ void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
                     // End rule for last element of require vector, bc for loop ends one index early.
                     pair<int,int> chainEnd ((int)eR[i][j][1].size()-1,-eR[i][j][1][eR[i][j][1].size()-1]);
                     chains[i][j][2].push_back(chainEnd);
-                    cout << "Added final end rule to chains: (a" << eR[i][j][1].size()-1 << ",-op" << eR[i][j][1][eR[i][j][1].size()-1] << ")" << endl;
+                    //cout << "Added final end rule to chains: (a" << eR[i][j][1].size()-1 << ",-op" << eR[i][j][1][eR[i][j][1].size()-1] << ")" << endl;
                 } else {
                     pair<int,int> chainEnd ((int)eR[i][j][1].size(),eR[i][j][1][eR[i][j][1].size()-1]);
                     chainsBackwards[i][j][2].push_back(chainEnd);
-                    cout << "Added final end rule to chainsBackwards: (a" << eR[i][j][1].size()-1 << ",-op" << -eR[i][j][1][eR[i][j][1].size()-1] << ")" << endl;
+                    //cout << "Added final end rule to chainsBackwards: (a" << eR[i][j][1].size()-1 << ",-op" << -eR[i][j][1][eR[i][j][1].size()-1] << ")" << endl;
                 }
             }
         }
