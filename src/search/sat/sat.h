@@ -30,9 +30,15 @@ void found_plan(int vars,
                 void * solver,
                 const vector<vector<int>> & operatorVars,
                 bool binary);
+void forall_step_to_solver(sat_capsule & capsule,
+                           void * solver,
+                           const vector<vector<int>> & operatorVars,
+                           int timeStep);
 bool sat_encoding(TaskProxy task_proxy, int steps);
 bool sat_encoding_binary(TaskProxy task_proxy, int steps);
-void sat_forall(TaskProxy task_proxy, vector<vector<int>> & factsAtTnow);
-void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed);
+void sat_forall(TaskProxy task_proxy);
+void forall_chains(vector<vector<vector<int>>> & erase,
+                   vector<vector<vector<int>>> & require,
+                   vector<vector<vector<vector<pair<int,int>>>>> & chainVec);
 }
 #endif

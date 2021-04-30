@@ -32,7 +32,7 @@ vector<vector<vector<vector<pair<int,int>>>>> chains;
 vector<vector<vector<vector<pair<int,int>>>>> chainsBackwards;
 
 // Storing the sizes of the require vectors.
-vector<vector<vector<vector<int>>>> requireSizes;
+vector<vector<int>> requireSizes;
 
 // Flag keeping track over sat_forall execution across multiple runs.
 bool satForallExecuted = false;
@@ -248,6 +248,77 @@ void found_plan(int vars, TaskProxy task_proxy, void * solver, const vector<vect
     plan_man.save_plan(plan, task_proxy);
 }
 
+void forall_step_to_solver(sat_capsule & capsule,
+                           void * solver,
+                           const vector<vector<int>> & operatorVars,
+                           int timeStep) {
+    for (size_t i=0; i<chains.size(); i++) {
+        for (size_t j=0; j<chains[i].size(); j++) {
+            vector<int> auxVars;
+            for (int k=0; k<requireSizes[i][j]; k++) {
+                auxVars.push_back(capsule.new_variable());
+            }
+            //cout << "AuxVars: " << auxVars << endl;
+            for (size_t k=0; k<chains[i][j].size(); k++) {
+                if (k == 0) {
+                    for (size_t l=0; l<chains[i][j][k].size(); l++) {
+                        int impLeft = operatorVars[timeStep][chains[i][j][k][l].first];
+                        int impRight = auxVars[chains[i][j][k][l].second];
+                        //cout << "Inserted forall-step chain starter rule " << impLeft << " -> " << impRight << endl;
+                        implies(solver, impLeft, impRight);
+                    }
+                } else if (k == 1) {
+                    for (size_t l=0; l<chains[i][j][k].size(); l++) {
+                        int impLeft = auxVars[chains[i][j][k][l].first];
+                        int impRight = auxVars[chains[i][j][k][l].second];
+                        //cout << "Inserted forall-step chain intersect rule " << impLeft << " -> " << impRight << endl;
+                        implies(solver, impLeft, impRight);
+                    }
+                } else if (k == 2) {
+                    for (size_t l=0; l<chains[i][j][k].size(); l++) {
+                        int impLeft = auxVars[chains[i][j][k][l].first];
+                        int impRight = -operatorVars[timeStep][chains[i][j][k][l].second];
+                        //cout << "Inserted forall-step chain end rule " << impLeft << " -> " << impRight << endl;
+                        implies(solver, impLeft, impRight);
+                    }
+                }
+            }
+        }
+    }
+    for (size_t i=0; i<chainsBackwards.size(); i++) {
+        for (size_t j=0; j<chainsBackwards[i].size(); j++) {
+            vector<int> auxVars;
+            for (int k=0; k<requireSizes[i][j]; k++) {
+                auxVars.push_back(capsule.new_variable());
+            }
+            for (size_t k=0; k<chainsBackwards[i][j].size(); k++) {
+                if (k == 0) {
+                    for (size_t l=0; l<chainsBackwards[i][j][k].size(); l++) {
+                        int impLeft = operatorVars[timeStep][chainsBackwards[i][j][k][l].first];
+                        int impRight = auxVars[chainsBackwards[i][j][k][l].second];
+                        //cout << "Inserted forall-step chainBackwards starter rule " << impLeft << " -> " << impRight << endl;
+                        implies(solver, impLeft, impRight);
+                    }
+                } else if (k == 1) {
+                    for (size_t l=0; l<chainsBackwards[i][j][k].size(); l++) {
+                        int impLeft = auxVars[chainsBackwards[i][j][k][l].first];
+                        int impRight = auxVars[chainsBackwards[i][j][k][l].second];
+                        //cout << "Inserted forall-step chainBackwards intersect rule " << impLeft << " -> " << impRight << endl;
+                        implies(solver, impLeft, impRight);
+                    }
+                } else if (k == 2) {
+                    for (size_t l=0; l<chainsBackwards[i][j][k].size(); l++) {
+                        int impLeft = auxVars[chainsBackwards[i][j][k][l].first];
+                        int impRight = -operatorVars[timeStep][chainsBackwards[i][j][k][l].second];
+                        //cout << "Inserted forall-step chainBackwards end rule " << impLeft << " -> " << impRight << endl;
+                        implies(solver, impLeft, impRight);
+                    }
+                }
+            }
+        }
+    }
+}
+
 bool sat_encoding(TaskProxy task_proxy, int steps) {
     // Start encoding timer here.
     utils::Timer enc_timer;
@@ -318,7 +389,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
         //cout << "TIMESTEP IS: " << timeStep << endl;
         // Testing forall encoding preparations.
         if (timeStep == 0 && !satForallExecuted) {
-            sat_forall(task_proxy, factsAtTnow);
+            sat_forall(task_proxy);
             satForallExecuted = true;
         }
 
@@ -388,71 +459,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
         atLeastOne(solver, capsule, operatorVars[timeStep]);
         //atMostOne(solver, capsule, operatorVars[timeStep]);
         // Replace at-most-one condition with forall_step clauses.
-        for (size_t i=0; i<chains.size(); i++) {
-            for (size_t j=0; j<chains[i].size(); j++) {
-                vector<int> auxVars;
-                for (int k=0; k<requireSizes[i][j][0][0]; k++) {
-                    auxVars.push_back(capsule.new_variable());
-                }
-                //cout << "AuxVars: " << auxVars << endl;
-                for (size_t k=0; k<chains[i][j].size(); k++) {
-                    if (k == 0) {
-                        for (size_t l=0; l<chains[i][j][k].size(); l++) {
-                            int impLeft = operatorVars[timeStep][chains[i][j][k][l].first];
-                            int impRight = auxVars[chains[i][j][k][l].second];
-                            //cout << "Inserted forall-step chain starter rule " << impLeft << " -> " << impRight << endl;
-                            implies(solver, impLeft, impRight);
-                        }
-                    } else if (k == 1) {
-                        for (size_t l=0; l<chains[i][j][k].size(); l++) {
-                            int impLeft = auxVars[chains[i][j][k][l].first];
-                            int impRight = auxVars[chains[i][j][k][l].second];
-                            //cout << "Inserted forall-step chain intersect rule " << impLeft << " -> " << impRight << endl;
-                            implies(solver, impLeft, impRight);
-                        }
-                    } else if (k == 2) {
-                        for (size_t l=0; l<chains[i][j][k].size(); l++) {
-                            int impLeft = auxVars[chains[i][j][k][l].first];
-                            int impRight = -operatorVars[timeStep][chains[i][j][k][l].second];
-                            //cout << "Inserted forall-step chain end rule " << impLeft << " -> " << impRight << endl;
-                            implies(solver, impLeft, impRight);
-                        }
-                    }
-                }
-            }
-        }
-        for (size_t i=0; i<chainsBackwards.size(); i++) {
-            for (size_t j=0; j<chainsBackwards[i].size(); j++) {
-                vector<int> auxVars;
-                for (int k=0; k<requireSizes[i][j][0][0]; k++) {
-                    auxVars.push_back(capsule.new_variable());
-                }
-                for (size_t k=0; k<chainsBackwards[i][j].size(); k++) {
-                    if (k == 0) {
-                        for (size_t l=0; l<chainsBackwards[i][j][k].size(); l++) {
-                            int impLeft = operatorVars[timeStep][chainsBackwards[i][j][k][l].first];
-                            int impRight = auxVars[chainsBackwards[i][j][k][l].second];
-                            //cout << "Inserted forall-step chainBackwards starter rule " << impLeft << " -> " << impRight << endl;
-                            implies(solver, impLeft, impRight);
-                        }
-                    } else if (k == 1) {
-                        for (size_t l=0; l<chainsBackwards[i][j][k].size(); l++) {
-                            int impLeft = auxVars[chainsBackwards[i][j][k][l].first];
-                            int impRight = auxVars[chainsBackwards[i][j][k][l].second];
-                            //cout << "Inserted forall-step chainBackwards intersect rule " << impLeft << " -> " << impRight << endl;
-                            implies(solver, impLeft, impRight);
-                        }
-                    } else if (k == 2) {
-                        for (size_t l=0; l<chainsBackwards[i][j][k].size(); l++) {
-                            int impLeft = auxVars[chainsBackwards[i][j][k][l].first];
-                            int impRight = -operatorVars[timeStep][chainsBackwards[i][j][k][l].second];
-                            //cout << "Inserted forall-step chainBackwards end rule " << impLeft << " -> " << impRight << endl;
-                            implies(solver, impLeft, impRight);
-                        }
-                    }
-                }
-            }
-        }
+        forall_step_to_solver(capsule, solver, operatorVars, timeStep);
 
         if (timeStep == 0) {
             operator_limit = get_number_of_clauses()-curr_clauses;
@@ -522,6 +529,16 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     // Start encoding timer here.
     utils::Timer enc_timer;
 
+    // Little hack to test forall_step
+    vector<vector<int>> factsAtTnow;
+    for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
+        vector<int> mutexGroupNow;
+        for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
+            mutexGroupNow.push_back(0);
+        }
+        factsAtTnow.push_back(mutexGroupNow);
+    }
+
     /*
     Using two 3D vectors to store the state variables (facts) for the current and
     following time step.
@@ -553,6 +570,12 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     }
 
     for (int timeStep=0; timeStep<steps; timeStep++) {
+        // Testing forall encoding preparations.
+        if (timeStep == 0 && !satForallExecuted) {
+            sat_forall(task_proxy);
+            satForallExecuted = true;
+        }
+
         // Add clauses reflecting the operators at the current time step.
         for (OperatorProxy const & operators : task_proxy.get_operators()) {
             int operatorVar = operatorVars[timeStep][operators.get_id()];
@@ -641,7 +664,8 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
 
         // Add clauses such that exactly one operator can be picked per time step.
         //atLeastOne(solver, capsule, operatorVars[timeStep]);
-        atMostOne(solver, capsule, operatorVars[timeStep]);
+        //atMostOne(solver, capsule, operatorVars[timeStep]);
+        forall_step_to_solver(capsule, solver, operatorVars, timeStep);
 
         // At the end of one step prepare the next time step, if it isn't the last.
         if (timeStep == steps-1) {
@@ -693,31 +717,29 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     return true;
 }
 
-void sat_forall(TaskProxy task_proxy, vector<vector<int>> & factsAtTnow) {    
+void sat_forall(TaskProxy task_proxy) {
     /*
-    Using a 4D vector based on the 2D structure of the fact vectors
-    to store operators erasing/requiring a specific fact (state variable).
+    Using 3D vectors to store operators erasing/requiring
+    a specific fact (state variable).
     */
-    vector<vector<vector<vector<int>>>> eraseRequire;
+    vector<vector<vector<int>>> eraseGroup;
+    vector<vector<vector<int>>> requireGroup;
+    vector<vector<vector<int>>> eraseGroupReversed;
+    vector<vector<vector<int>>> requireGroupReversed;
 
-    vector<vector<vector<vector<int>>>> requireSizesTemp;
+    // Storing the sizes of the require vectors of requireGroup.
+    vector<vector<int>> requireGroupSizes;
 
-    // Create the structure of the eraseRequire, requireSizesTemp and chains 4D vectors.
-    for (size_t i=0; i<factsAtTnow.size(); i++) {
-        vector<vector<vector<int>>> mutexGroup;
-        vector<vector<vector<int>>> mutexReqSize;
+    // Create the structure of chains, eraseGroup and requireGroupSizes
+    for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
         vector<vector<vector<pair<int,int>>>> chainGroup;
-        for (size_t j=0; j<factsAtTnow[i].size(); j++) {
-            vector<vector<int>> factVec;
-            vector<int> eraseVec;
-            vector<int> requireVec;
-            factVec.push_back(eraseVec);
-            factVec.push_back(requireVec);
-            mutexGroup.push_back(factVec);
-            vector<vector<int>> factReqSize;
-            vector<int> requireSize;
-            factReqSize.push_back(requireSize);
-            mutexReqSize.push_back(factReqSize);
+        vector<vector<int>> mutexGroup;
+        // The size vector only needs one vector per mutex group.
+        vector<int> mutexGroupSize;
+        requireGroupSizes.push_back(mutexGroupSize);
+        for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
+            // Chains are constructed in three steps, so 3 vectors are needed
+            // to store the resulting formula pairs.
             vector<vector<pair<int,int>>> chainVec;
             vector<pair<int,int>> chainStart;
             vector<pair<int,int>> chainIntersect;
@@ -726,16 +748,20 @@ void sat_forall(TaskProxy task_proxy, vector<vector<int>> & factsAtTnow) {
             chainVec.push_back(chainIntersect);
             chainVec.push_back(chainEnd);
             chainGroup.push_back(chainVec);
+            // Per variable a vector is needed to store a list of opertors.
+            vector<int> variableVec;
+            mutexGroup.push_back(variableVec);
         }
-        eraseRequire.push_back(mutexGroup);
-        requireSizesTemp.push_back(mutexReqSize);
         chains.push_back(chainGroup);
+        eraseGroup.push_back(mutexGroup);
     }
+    // Copy the structure because it's the same
+    requireGroup = eraseGroup;
+    eraseGroupReversed = eraseGroup;
+    requireGroupReversed = eraseGroup;
 
-    // Copy of the empty construct of chains.
+    // Same structure needed for the vector with all elements reversed.
     chainsBackwards = chains;
-    // Copy of the empty construct of eraseRequire.
-    vector<vector<vector<vector<int>>>> eraseRequireReversed = eraseRequire;
 
     for (OperatorProxy const & operators : task_proxy.get_operators()) {
         int operatorVar = operators.get_id();
@@ -748,7 +774,7 @@ void sat_forall(TaskProxy task_proxy, vector<vector<int>> & factsAtTnow) {
                 if (preconditions.get_pair().var == effVar) {
                     matchFound = true;
                     // Add operator to erase vector of this precondition.
-                    eraseRequire[effVar][preconditions.get_pair().value][0].push_back(operatorVar);
+                    eraseGroup[effVar][preconditions.get_pair().value].push_back(operatorVar);
                     break;
                 }
             }
@@ -756,9 +782,9 @@ void sat_forall(TaskProxy task_proxy, vector<vector<int>> & factsAtTnow) {
             // to all erase vectors of the possible preconditions, except for
             // the fact that becomes true through the operator's effect.
             if(!matchFound) {
-                for (size_t i=0; i<eraseRequire[effVar].size(); i++) {
+                for (size_t i=0; i<eraseGroup[effVar].size(); i++) {
                     if (i != (size_t)effects.get_fact().get_pair().value) {
-                        eraseRequire[effVar][i][0].push_back(operatorVar);
+                        eraseGroup[effVar][i].push_back(operatorVar);
                     }
                 }
             }
@@ -766,37 +792,50 @@ void sat_forall(TaskProxy task_proxy, vector<vector<int>> & factsAtTnow) {
         // Go through preconditions and add operator ID to all require vectors
         // of the corresponding preconditions.
         for (FactProxy const & preconditions : operators.get_preconditions()) {
-            eraseRequire[preconditions.get_pair().var][preconditions.get_pair().value][1].push_back(operatorVar);
+            requireGroup[preconditions.get_pair().var][preconditions.get_pair().value].push_back(operatorVar);
         }
     }
 
-    // Fill requireSizes with the sizes of their respective vectors.
-    for (size_t i=0; i<requireSizesTemp.size(); i++) {
-        for (size_t j=0; j<requireSizesTemp[i].size(); j++) {
-            //requireSizes[i][j][0].push_back(eraseRequire[i][j][0].size());
-            requireSizesTemp[i][j][0].push_back(eraseRequire[i][j][1].size());
+    // Fill requireGroupSizes with the sizes of their respective vectors
+    for (size_t i=0; i<requireGroup.size(); i++) {
+        for (size_t j=0; j<requireGroup[i].size(); j++) {
+            // If erase and require have only one element which is the same it can
+            // safely be deleted to avoid registering unncessary aux variables.
+            if (eraseGroup[i][j].size()==1 && requireGroup[i][j].size()==1 &&
+                (eraseGroup[i][j][0]==requireGroup[i][j][0])) {
+                eraseGroup[i][j].pop_back();
+                requireGroup[i][j].pop_back();
+            }
+            requireGroupSizes[i].push_back(requireGroup[i][j].size());
         }
     }
-    requireSizes = requireSizesTemp;
+    requireSizes = requireGroupSizes;
     
-    // Construct eraseRequireReversed from eraseRequire.
-    for (size_t i=0; i<eraseRequire.size(); i++) {
-        for (size_t j=0; j<eraseRequire[i].size(); j++) {
-            for (size_t k=eraseRequire[i][j][0].size(); k>0; k--) {
-                eraseRequireReversed[i][j][0].push_back(-eraseRequire[i][j][0][k-1]);
-            }
-            for (size_t l=eraseRequire[i][j][1].size(); l>0; l--) {
-                eraseRequireReversed[i][j][1].push_back(-eraseRequire[i][j][0][l-1]);
+    // Construct eraseGroupReversed from eraseGroup
+    for (size_t i=0; i<eraseGroup.size(); i++) {
+        for (size_t j=0; j<eraseGroup[i].size(); j++) {
+            for (size_t k=eraseGroup[i][j].size(); k>0; k--) {
+                eraseGroupReversed[i][j].push_back(-eraseGroup[i][j][k-1]);
             }
         }
     }
+    // Construct requireGroupReversed from requireGroup
+    for (size_t i=0; i<requireGroup.size(); i++) {
+        for (size_t j=0; j<requireGroup[i].size(); j++) {
+            for (size_t k=requireGroup[i][j].size(); k>0; k--) {
+                requireGroupReversed[i][j].push_back(-requireGroup[i][j][k-1]);
+            }
+        }
+    }
+    forall_chains(eraseGroup, requireGroup, chains);
+    forall_chains(eraseGroupReversed, requireGroupReversed, chainsBackwards);
 
-    forall_chains(eraseRequire, false);
-    forall_chains(eraseRequireReversed, true);
     /*
     Debugging Code
-    cout << "EraseRequire: " << eraseRequire << endl;
-    cout << "EraseRequireReversed: " << eraseRequireReversed << endl;
+    cout << "EraseGroup: " << eraseGroup << endl;
+    cout << "RequireGroup: " << requireGroup << endl;
+    cout << "EraseGroupReversed: " << eraseGroupReversed << endl;
+    cout << "RequireGroupReversed: " << requireGroupReversed << endl;
     cout << "requireSizes: " << requireSizes << endl;
 
     for (size_t i=0; i<chainsBackwards.size(); i++) {
@@ -811,38 +850,40 @@ void sat_forall(TaskProxy task_proxy, vector<vector<int>> & factsAtTnow) {
     */
 }
 
-void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
+void forall_chains(vector<vector<vector<int>>> & erase,
+                    vector<vector<vector<int>>> & require,
+                    vector<vector<vector<vector<pair<int,int>>>>> & chainVec) {
     /*
-    Starting the chain search which consists of three parts:
+    The chain search consists of three parts:
     1. Chain starters
     2. Chain intersections
     3. Chain ends
     */
-    for (size_t i=0; i<eR.size(); i++) {
-        for (size_t j=0; j<eR[i].size(); j++) {
+    for (size_t i=0; i<erase.size(); i++) {
+        for (size_t j=0; j<erase[i].size(); j++) {
             // 1. Chain starters
-            // Iterating through erase vector (index = 0).
             size_t firstIndex = 0;
-            for (size_t k=0; k<eR[i][j][0].size(); k++) {
+            for (size_t k=0; k<erase[i][j].size(); k++) {
                 // Edge case: Require vector is empty
-                if (eR[i][j][1].size()<=0) {
+                if (require[i][j].size()<=0) {
                     continue;
                 }
-                // Iterating through require vector (index = 1).
-                for (size_t l=firstIndex; l<eR[i][j][1].size(); l++) {
-                    if (eR[i][j][0][k]<eR[i][j][1][l]) {
-                        if (!reversed) {
-                            // Create rule o^i_t -> a^j,m_t. a^j,m_t represents it's position (index)
-                            // inside the require vector. Will be used for replacement with aux var.
-                            pair<int,int> chainStarter (eR[i][j][0][k],l);
+                for (size_t l=firstIndex; l<require[i][j].size(); l++) {
+                    if (erase[i][j][k]<require[i][j][l]) {
+                        // Create rule o^i_t -> a^j,m_t. a^j,m_t represents it's position (index)
+                        // inside the require vector. Will be used for replacement with aux var.
+                        if (erase[i][j][k]<0) {
+                            // Correction for values from reversed vectors.
+                            pair<int,int> chainStarter (-erase[i][j][k],l);
                             // Add rule pair to chainStarter vector (index = 0) in chains.
-                            chains[i][j][0].push_back(chainStarter);
-                            //cout << "Added starter rule to chains: (op" << eR[i][j][0][k] << ",a" << l << ")" << endl; 
+                            chainVec[i][j][0].push_back(chainStarter);
+                            //cout << "Added starter rule to chainsBackwards: (op" << erase[i][j][k] << ",a" << l << ")" << endl; 
                             break;
                         } else {
-                            pair<int,int> chainStarter (-eR[i][j][0][k],l);
-                            chainsBackwards[i][j][0].push_back(chainStarter);
-                            //cout << "Added starter rule to chainsBackwards: (op" << -eR[i][j][0][k] << ",a" << l << ")" << endl;
+                            pair<int,int> chainStarter (erase[i][j][k],l);
+                            // Add rule pair to chainStarter vector (index = 0) in chains.
+                            chainVec[i][j][0].push_back(chainStarter);
+                            //cout << "Added starter rule to chains: (op" << erase[i][j][k] << ",a" << l << ")" << endl; 
                             break;
                         }
                     } else {
@@ -851,54 +892,52 @@ void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
                 }
             }
             // Edge case: Require vector is empty
-            if (eR[i][j][1].size()<=0) {
+            if (require[i][j].size()<=0) {
                 continue;
             }
-            // Iterating through require vector (index = 1).
-            for (size_t k=0; k<eR[i][j][1].size()-1; k++) {
-                if (eR[i][j][1][k]>eR[i][j][0][0]) {
+            for (size_t k=0; k<require[i][j].size()-1; k++) {
+                if (require[i][j][k]>erase[i][j][0]) {
                     // 2. Chain intersections
                     // Create rule a^i,m_t -> a^j,m_t. Variables represent their position (index)
                     // inside their require vector. Will be used for replacement with aux var.
                     pair<int,int> chainIntersect (k,k+1);
-                    if (!reversed) {
-                        // Add rule pair to chainIntersect vector (index = 1).
-                        chains[i][j][1].push_back(chainIntersect);
-                        //cout << "Added intersect rule to chains: (a" << k << ",a" << k+1 << ")" << endl;
-                    } else {
-                        chainsBackwards[i][j][1].push_back(chainIntersect);
-                        //cout << "Added intersect rule to chainsBackwards: (a" << k << ",a" << k+1 << ")" << endl;
-                    }                    
-
-                    if (!reversed) {
+                    // Add rule pair to chainIntersect vector (index = 1).
+                    chainVec[i][j][1].push_back(chainIntersect);
+                    //cout << "Added intersect rule to chainVec: (a" << k << ",a" << k+1 << ")" << endl;
+                    if (require[i][j][k]<0) {
                         // 3. Chain ends
                         // Create rule a^i,m_t -> -o^i_t. a^i,m_t represents it's position (index)
                         // inside the require vector. Will be used for replacement with aux var.
-                        pair<int,int> chainEnd (k,eR[i][j][1][k]);
-                        // Add rule pair to chainEnd vector (index = 2).
-                        chains[i][j][2].push_back(chainEnd);
-                        //cout << "Added end rule to chains: (a" << k << ",-op" << eR[i][j][1][k] << ")" << endl;
+                        // Correction for values from reversed vectors.
+                        pair<int,int> chainEnd (k,-require[i][j][k]);
+                        chainVec[i][j][2].push_back(chainEnd);
+                        //cout << "Added end rule to chainsBackwards: (a" << k << ",-op" << -require[i][j][k] << ")" << endl;
                     } else {
-                        pair<int,int> chainEnd (k,-eR[i][j][1][k]);
-                        chainsBackwards[i][j][2].push_back(chainEnd);
-                        //cout << "Added end rule to chainsBackwards: (a" << k << ",-op" << -eR[i][j][1][k] << ")" << endl;
+                        pair<int,int> chainEnd (k,require[i][j][k]);
+                        // Add rule pair to chainEnd vector (index = 2).
+                        chainVec[i][j][2].push_back(chainEnd);
+                        //cout << "Added end rule to chains: (a" << k << ",-op" << require[i][j][k] << ")" << endl;
                     }                    
                 }
             }
-            if (eR[i][j][1][eR[i][j][1].size()-1]>eR[i][j][0][0]) {
-                if (!reversed) {
-                    // End rule for last element of require vector, bc for loop ends one index early.
-                    pair<int,int> chainEnd ((int)eR[i][j][1].size()-1,eR[i][j][1][eR[i][j][1].size()-1]);
-                    chains[i][j][2].push_back(chainEnd);
-                    //cout << "Added final end rule to chains: (a" << eR[i][j][1].size()-1 << ",-op" << eR[i][j][1][eR[i][j][1].size()-1] << ")" << endl;
+            // End rule for last element of require vector, bc prior for loop ends one index early.
+            if (require[i][j][require[i][j].size()-1]>erase[i][j][0]) {
+                if (require[i][j][require[i][j].size()-1]<0) {
+                    // Correction for values from reversed vectors.
+                    pair<int,int> chainEnd ((int)require[i][j].size()-1,-require[i][j][require[i][j].size()-1]);
+                    chainVec[i][j][2].push_back(chainEnd);
+                    //cout << "Added final end rule to chainsBackwards: (a" << require[i][j].size()-1
+                    //     << ",-op" << -require[i][j][require[i][j].size()-1] << ")" << endl;
                 } else {
-                    pair<int,int> chainEnd ((int)eR[i][j][1].size()-1,-eR[i][j][1][eR[i][j][1].size()-1]);
-                    chainsBackwards[i][j][2].push_back(chainEnd);
-                    //cout << "Added final end rule to chainsBackwards: (a" << eR[i][j][1].size()-1 << ",-op" << -eR[i][j][1][eR[i][j][1].size()-1] << ")" << endl;
+                    pair<int,int> chainEnd ((int)require[i][j].size()-1,require[i][j][require[i][j].size()-1]);
+                    chainVec[i][j][2].push_back(chainEnd);
+                    //cout << "Added final end rule to chains: (a" << require[i][j].size()-1 
+                    //     << ",-op" << require[i][j][require[i][j].size()-1] << ")" << endl;
                 }
             }
         }
     }
+
 }
 
 }
