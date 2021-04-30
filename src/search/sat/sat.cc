@@ -270,6 +270,34 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
 
     sat_init(task_proxy, capsule, factsAtTnow, factsAtTplusOne, operatorVars);
 
+    // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@DEBUG@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    /*
+    for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
+        cout << "Variable group " << i << ": ";
+        for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
+            cout << task_proxy.get_variables()[i].get_fact(j).get_name() << "  ";
+        }
+        cout << endl;
+    }
+        
+    for (OperatorProxy const & operators : task_proxy.get_operators()) {
+        cout << "Operator " << operators.get_id() << " is called " << operators.get_name() << ": ";
+        for (FactProxy const & preconditions : operators.get_preconditions()) {
+            cout << preconditions.get_name() << " (" << preconditions.get_pair() << ") ";
+        }
+        cout << "--> ";
+        for (EffectProxy const & effects : operators.get_effects()) {
+            cout << effects.get_fact().get_name() << " (" << effects.get_fact().get_pair() << ") ";
+        }
+        cout << endl;
+    }
+
+    cout << "FactsAtTnow: " << factsAtTnow << endl;
+    cout << "FactsAtTplusOne: " << factsAtTplusOne << endl;
+    cout << "Operator Vars: " << operatorVars << endl;
+    */
+    // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@DEBUG@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
     // Add the variables reflecting the initial state of the problem.
     for (size_t i=0; i<factsAtTnow.size(); i++) {
         for (size_t j=0; j<factsAtTnow[i].size(); j++) {
@@ -287,7 +315,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     int operator_limit = 0;
 
     for (int timeStep=0; timeStep<steps; timeStep++) {
-        cout << "TIMESTEP IS: " << timeStep << endl;
+        //cout << "TIMESTEP IS: " << timeStep << endl;
         // Testing forall encoding preparations.
         if (timeStep == 0 && !satForallExecuted) {
             sat_forall(task_proxy, factsAtTnow);
@@ -366,26 +394,27 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
                 for (int k=0; k<requireSizes[i][j][0][0]; k++) {
                     auxVars.push_back(capsule.new_variable());
                 }
+                //cout << "AuxVars: " << auxVars << endl;
                 for (size_t k=0; k<chains[i][j].size(); k++) {
                     if (k == 0) {
                         for (size_t l=0; l<chains[i][j][k].size(); l++) {
                             int impLeft = operatorVars[timeStep][chains[i][j][k][l].first];
                             int impRight = auxVars[chains[i][j][k][l].second];
-                            cout << "Inserted forall-step chain starter rule " << impLeft << " -> " << impRight << endl;
+                            //cout << "Inserted forall-step chain starter rule " << impLeft << " -> " << impRight << endl;
                             implies(solver, impLeft, impRight);
                         }
                     } else if (k == 1) {
                         for (size_t l=0; l<chains[i][j][k].size(); l++) {
                             int impLeft = auxVars[chains[i][j][k][l].first];
                             int impRight = auxVars[chains[i][j][k][l].second];
-                            cout << "Inserted forall-step chain intersect rule " << impLeft << " -> " << impRight << endl;
+                            //cout << "Inserted forall-step chain intersect rule " << impLeft << " -> " << impRight << endl;
                             implies(solver, impLeft, impRight);
                         }
                     } else if (k == 2) {
                         for (size_t l=0; l<chains[i][j][k].size(); l++) {
                             int impLeft = auxVars[chains[i][j][k][l].first];
                             int impRight = -operatorVars[timeStep][chains[i][j][k][l].second];
-                            cout << "Inserted forall-step chain end rule " << impLeft << " -> " << impRight << endl;
+                            //cout << "Inserted forall-step chain end rule " << impLeft << " -> " << impRight << endl;
                             implies(solver, impLeft, impRight);
                         }
                     }
@@ -403,28 +432,27 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
                         for (size_t l=0; l<chainsBackwards[i][j][k].size(); l++) {
                             int impLeft = operatorVars[timeStep][chainsBackwards[i][j][k][l].first];
                             int impRight = auxVars[chainsBackwards[i][j][k][l].second];
-                            cout << "Inserted forall-step chainBackwards starter rule " << impLeft << " -> " << impRight << endl;
+                            //cout << "Inserted forall-step chainBackwards starter rule " << impLeft << " -> " << impRight << endl;
                             implies(solver, impLeft, impRight);
                         }
                     } else if (k == 1) {
                         for (size_t l=0; l<chainsBackwards[i][j][k].size(); l++) {
                             int impLeft = auxVars[chainsBackwards[i][j][k][l].first];
                             int impRight = auxVars[chainsBackwards[i][j][k][l].second];
-                            cout << "Inserted forall-step chainBackwards intersect rule " << impLeft << " -> " << impRight << endl;
+                            //cout << "Inserted forall-step chainBackwards intersect rule " << impLeft << " -> " << impRight << endl;
                             implies(solver, impLeft, impRight);
                         }
                     } else if (k == 2) {
                         for (size_t l=0; l<chainsBackwards[i][j][k].size(); l++) {
                             int impLeft = auxVars[chainsBackwards[i][j][k][l].first];
                             int impRight = -operatorVars[timeStep][chainsBackwards[i][j][k][l].second];
-                            cout << "Inserted forall-step chainBackwards end rule " << impLeft << " -> " << impRight << endl;
+                            //cout << "Inserted forall-step chainBackwards end rule " << impLeft << " -> " << impRight << endl;
                             implies(solver, impLeft, impRight);
                         }
                     }
                 }
             }
         }
-        cout << "LAST FORALL_STEP CLAUSE ADDED!" << endl;
 
         if (timeStep == 0) {
             operator_limit = get_number_of_clauses()-curr_clauses;
@@ -765,6 +793,22 @@ void sat_forall(TaskProxy task_proxy, vector<vector<int>> & factsAtTnow) {
 
     forall_chains(eraseRequire, false);
     forall_chains(eraseRequireReversed, true);
+    /*
+    Debugging Code
+    cout << "EraseRequire: " << eraseRequire << endl;
+    cout << "EraseRequireReversed: " << eraseRequireReversed << endl;
+    cout << "requireSizes: " << requireSizes << endl;
+
+    for (size_t i=0; i<chainsBackwards.size(); i++) {
+        for (size_t j=0; j<chainsBackwards[i].size(); j++) {
+            for (size_t k=0; k<chainsBackwards[i][j][2].size(); k++) {
+                cout << "ChainsBackwards[" << i << "][" << j << "][2][" << k << "]=(" <<
+                chainsBackwards[i][j][2][k].first << "," << chainsBackwards[i][j][2][k].second << ") ";
+            }
+            cout << endl;
+        }
+    }
+    */
 }
 
 void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
@@ -848,7 +892,7 @@ void forall_chains(vector<vector<vector<vector<int>>>> & eR, bool reversed) {
                     chains[i][j][2].push_back(chainEnd);
                     //cout << "Added final end rule to chains: (a" << eR[i][j][1].size()-1 << ",-op" << eR[i][j][1][eR[i][j][1].size()-1] << ")" << endl;
                 } else {
-                    pair<int,int> chainEnd ((int)eR[i][j][1].size(),-eR[i][j][1][eR[i][j][1].size()-1]);
+                    pair<int,int> chainEnd ((int)eR[i][j][1].size()-1,-eR[i][j][1][eR[i][j][1].size()-1]);
                     chainsBackwards[i][j][2].push_back(chainEnd);
                     //cout << "Added final end rule to chainsBackwards: (a" << eR[i][j][1].size()-1 << ",-op" << -eR[i][j][1][eR[i][j][1].size()-1] << ")" << endl;
                 }
