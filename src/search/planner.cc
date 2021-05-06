@@ -42,7 +42,7 @@ int main(int argc, const char **argv) {
         bool plan_found = false;
         int round = 1;
         while (!plan_found) {
-            plan_found = sat::sat_encoding(task_proxy, round);
+            plan_found = sat::sat_encoding_binary(task_proxy, round);
             round *= 2;
         }
         // sat::sat_encoding(task_proxy, 34);

@@ -388,17 +388,18 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
             satCollectInvariantsExecuted = true;
         }
 
-        int curr_clauses;
+        int curr_clauses = 0;
         if (timeStep == 0) {
             curr_clauses = get_number_of_clauses();
         }
         // Add clauses reflecting the mutex condition of a group of variables.
         for (size_t i=0; i<factsAtTplusOne.size(); i++) {
-            atLeastOne(solver, capsule, factsAtTplusOne[i]);
+            atLeastOne(solver, factsAtTplusOne[i]);
             atMostOne(solver, capsule, factsAtTplusOne[i]);
         }
         if (timeStep == 0) {
             mutex_clauses = get_number_of_clauses()-curr_clauses;
+            curr_clauses = get_number_of_clauses();
         }
 
         // Vector to collect actions/operators executing the same effects.
@@ -412,9 +413,6 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
         frameAxioms.push_back(variable);
         }
 
-        if (timeStep == 0) {
-            curr_clauses = get_number_of_clauses();
-        }
         // Add clauses reflecting the operators at the current time step.
         for (OperatorProxy const & operators : task_proxy.get_operators()) {
             int operatorVar = operatorVars[timeStep][operators.get_id()];
@@ -451,7 +449,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
             curr_clauses = get_number_of_clauses();
         }
         // Add clauses such that exactly one operator can be picked per time step.
-        atLeastOne(solver, capsule, operatorVars[timeStep]);
+        atLeastOne(solver, operatorVars[timeStep]);
         //atMostOne(solver, capsule, operatorVars[timeStep]);
         // Replace at-most-one condition with forall_step clauses.
         forall_step_to_solver(capsule, solver, operatorVars, timeStep);
@@ -526,7 +524,12 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     cout << "[OperatorLimitClauses=" << operator_limit << "]" << endl;
     cout << "[InvariantClauses=" << invariant_clauses << "]" << endl;
     utils::Timer solution_timer;
-    cout << ipasir_solve(solver) << endl;
+    cout << ipasir_solve(solver);
+    if (ipasir_solve(solver) == 20) {
+        cout << ": NO solution found!" << endl;
+    } else if (ipasir_solve(solver) == 10) {
+        cout << ": SOLUTION FOUND!" << endl;
+    }
     solution_timer.stop();
     cout << "[solvingTime=" << solution_timer << "]" << endl;
 
@@ -534,28 +537,16 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     if (ipasir_solve(solver) == 20) {
         return false;
     }
-    
     if (ipasir_solve(solver) == 10){
         // Use plan_manager to save a found plan.
         found_plan(capsule.number_of_variables, task_proxy, solver, operatorVars, false);
     }
-    // To make compiler shut up.
     return true;
 }
 
 bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     // Start encoding timer here.
     utils::Timer enc_timer;
-
-    // Little hack to test forall_step
-    vector<vector<int>> factsAtTnow;
-    for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
-        vector<int> mutexGroupNow;
-        for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
-            mutexGroupNow.push_back(0);
-        }
-        factsAtTnow.push_back(mutexGroupNow);
-    }
 
     /*
     Using two 3D vectors to store the state variables (facts) for the current and
@@ -587,13 +578,30 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
         }
     }
 
+    int init_clauses = get_number_of_clauses();
+    int operator_clauses = 0;
+    int frame_axioms = 0;
+    int operator_limit = 0;
+    int invariant_clauses = 0;
+
     for (int timeStep=0; timeStep<steps; timeStep++) {
-        // Testing forall encoding preparations.
+        // Forall-step rules only need to be generated once at the start,
+        // after that they just need to be encoded every solver run.
         if (timeStep == 0 && !satForallExecuted) {
             sat_forall(task_proxy);
             satForallExecuted = true;
         }
+        // Invariants collection only needs to be run once at the beginning,
+        // after that they just need to be encoded every time step.
+        if (timeStep == 0 && !satCollectInvariantsExecuted) {
+            collect_invariants(task_proxy);
+            satCollectInvariantsExecuted = true;
+        }
 
+        int curr_clauses = 0;
+        if (timeStep == 0) {
+            curr_clauses = get_number_of_clauses();
+        }
         // Add clauses reflecting the operators at the current time step.
         for (OperatorProxy const & operators : task_proxy.get_operators()) {
             int operatorVar = operatorVars[timeStep][operators.get_id()];
@@ -607,6 +615,10 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
                     implies(solver, operatorVar, binaryFactsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_pair().value][i]);
                 }
             }
+        }
+        if (timeStep == 0) {
+            operator_clauses = get_number_of_clauses()-curr_clauses;
+            curr_clauses = get_number_of_clauses();
         }
 
         // Vector to collect frame axiom operators.
@@ -629,7 +641,6 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
             int operatorVar = operatorVars[timeStep][operators.get_id()];
             for (EffectProxy const & effects : operators.get_effects()) {
                 int effVar = effects.get_fact().get_pair().var;
-                // TODO: Not sure, if this is the best way to do this?!
                 bool matchFound = false;
                 for (FactProxy const & preconditions : operators.get_preconditions()) {
                     if (preconditions.get_pair().var == effVar) {
@@ -645,7 +656,7 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
                                     frameAxioms[effVar][1+2*i].push_back(operatorVar);
                             }
                         }
-                        // After match is found there's no need to check for more matches.
+                        // After a match is found there's no need to check for more matches.
                         break;
                     }
                 }
@@ -664,6 +675,7 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
                 }
             }
         }
+        // Add all frame axiom clauses.
         for (size_t i=0; i<frameAxioms.size(); i++) {
             for (size_t j=0; j<frameAxioms[i].size(); j++) {
                 if (j%2 == 0 && frameAxioms[i][j].size()>0) {
@@ -679,33 +691,124 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
                 }
             }
         }
+        if (timeStep == 0) {
+            frame_axioms = get_number_of_clauses()-curr_clauses;
+            curr_clauses = get_number_of_clauses();
+        }
 
         // Add clauses such that exactly one operator can be picked per time step.
-        //atLeastOne(solver, capsule, operatorVars[timeStep]);
+        atLeastOne(solver, operatorVars[timeStep]);
         //atMostOne(solver, capsule, operatorVars[timeStep]);
         forall_step_to_solver(capsule, solver, operatorVars, timeStep);
 
+        if (timeStep == 0) {
+            operator_limit = get_number_of_clauses()-curr_clauses;
+            curr_clauses = get_number_of_clauses();
+        }
+        // Add invariant clauses to solver.
+        for (size_t i=0; i<invariants.size(); i++) {
+            if (invariants.size()>0) {
+                for (size_t j=0; j<invariants[i].size(); j++) {
+                    if (invariants[i][j].size()>0) {
+                        for (size_t k=0; k<invariants[i][j].size(); k++) {
+                            if (i<(size_t)invariants[i][j][k].var) {
+                                vector<int> left;
+                                vector<int> right;
+                                for (size_t l=0; l<binaryFactsAtTnow[i][j].size(); l++) {
+                                    left.push_back(binaryFactsAtTnow[i][j][l]);
+                                }
+                                for (size_t r=0; r<binaryFactsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value].size(); r++) {
+                                    right.push_back(binaryFactsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value][r]);
+                                }
+                                andImpliesAllNot(solver, right, left);
+                            } else if (i==(size_t)invariants[i][j][k].var && j<(size_t)invariants[i][j][k].value) {
+                                vector<int> left;
+                                vector<int> right;
+                                for (size_t l=0; l<binaryFactsAtTnow[i][j].size(); l++) {
+                                    left.push_back(binaryFactsAtTnow[i][j][l]);
+                                }
+                                for (size_t r=0; r<binaryFactsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value].size(); r++) {
+                                    right.push_back(binaryFactsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value][r]);
+                                }
+                                andImpliesAllNot(solver, right, left);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (timeStep == 0) {
+            invariant_clauses = get_number_of_clauses()-curr_clauses;
+        }
+
         // At the end of one step prepare the next time step, if it isn't the last.
         if (timeStep == steps-1) {
+            // In the very last timestep don't forget to add invariants as well.
+            for (size_t i=0; i<invariants.size(); i++) {
+                if (invariants.size()>0) {
+                    for (size_t j=0; j<invariants[i].size(); j++) {
+                        if (invariants[i][j].size()>0) {
+                            for (size_t k=0; k<invariants[i][j].size(); k++) {
+                                if (i<(size_t)invariants[i][j][k].var) {
+                                    vector<int> left;
+                                    vector<int> right;
+                                    for (size_t l=0; l<binaryFactsAtTplusOne[i][j].size(); l++) {
+                                        left.push_back(binaryFactsAtTplusOne[i][j][l]);
+                                    }
+                                    for (size_t r=0; r<binaryFactsAtTplusOne[invariants[i][j][k].var][invariants[i][j][k].value].size(); r++) {
+                                        right.push_back(binaryFactsAtTplusOne[invariants[i][j][k].var][invariants[i][j][k].value][r]);
+                                    }
+                                    andImpliesAllNot(solver, right, left);
+                                } else if (i==(size_t)invariants[i][j][k].var && j<(size_t)invariants[i][j][k].value) {
+                                    vector<int> left;
+                                    vector<int> right;
+                                    for (size_t l=0; l<binaryFactsAtTplusOne[i][j].size(); l++) {
+                                        left.push_back(binaryFactsAtTplusOne[i][j][l]);
+                                    }
+                                    for (size_t r=0; r<binaryFactsAtTplusOne[invariants[i][j][k].var][invariants[i][j][k].value].size(); r++) {
+                                        right.push_back(binaryFactsAtTplusOne[invariants[i][j][k].var][invariants[i][j][k].value][r]);
+                                    }
+                                    andImpliesAllNot(solver, right, left);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             break;
         } else {
             sat_step_binary(task_proxy, capsule, solver, binaryFactsAtTnow, binaryFactsAtTplusOne, operatorVars);
         }
     }
+    int curr_clauses = get_number_of_clauses();
     // Add the variables reflecting the goal state of the problem after the last time step.
     for (size_t i=0; i<task_proxy.get_goals().size(); i++) {
         for (size_t j=0; j<binaryFactsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value].size(); j++) {
             assertYes(solver, binaryFactsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value][j]);
         }
     }
+    int goal_clauses = get_number_of_clauses()-curr_clauses;
 
     // Stop encoding timer here.
     enc_timer.stop();
     cout << "[encodingTime=" << enc_timer << "]" << endl;
-    cout << "That many clauses have been added: " << get_number_of_clauses() << endl;
+    cout << capsule.number_of_variables << " variables have been created." << endl;
+    cout << get_number_of_clauses() << " clauses have been added." << endl;
     reset_number_of_clauses();
+    cout << "[InitClauses=" << init_clauses << "]" << endl;
+    cout << "[GoalClauses=" << goal_clauses << "]" << endl;
+    cout << "Per time step the following clauses have been added" << endl;
+    cout << "[OperatorClauses=" << operator_clauses << "]" << endl;
+    cout << "[FrameAxiomClauses=" << frame_axioms << "]" << endl;
+    cout << "[OperatorLimitClauses=" << operator_limit << "]" << endl;
+    cout << "[InvariantClauses=" << invariant_clauses << "]" << endl;
     utils::Timer solution_timer;
-    cout << ipasir_solve(solver) << endl;
+    cout << ipasir_solve(solver);
+    if (ipasir_solve(solver) == 20) {
+        cout << ": NO solution found!" << endl;
+    } else if (ipasir_solve(solver) == 10) {
+        cout << ": SOLUTION FOUND!" << endl;
+    }
     solution_timer.stop();
     cout << "[solvingTime=" << solution_timer << "]" << endl;
 
@@ -713,25 +816,10 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     if (ipasir_solve(solver) == 20) {
         return false;
     }
-    
     if (ipasir_solve(solver) == 10){
+        // Use plan_manager to save a found plan.
         found_plan(capsule.number_of_variables, task_proxy, solver, operatorVars, true);
-        
-        string validator = "validate";
-        string domain_file = "domain.pddl";
-        string problem_file = "problem-p09.pddl";
-        string plan_file = "found_plan_binary";
-        string full_call = validator + " " + domain_file + " " + problem_file + " " + plan_file;
-        const char * cmd_call = full_call.c_str();
-        int val_return = system(cmd_call);
-        if (val_return == 0) {
-            return true;
-        } else {
-            cerr << "ERROR: Calling validator failed!" << endl;
-            return true;
-        }
     }
-    // To make compiler shut up.
     return true;
 }
 

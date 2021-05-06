@@ -24,7 +24,7 @@ std::string path_string_no_sep(std::vector<int> & path){
 }
 
 std::string pad_string(std::string s, int chars){
-	while (s.size() < chars)
+	while (s.size() < (size_t)chars)
 		s += " ";
 	return s;
 }
@@ -160,6 +160,15 @@ void andImplies(void* solver, std::vector<int> & i, int j){
 	number_of_clauses++;
 }
 
+void andImpliesAllNot(void* solver, std::vector<int> & i, std::vector<int> & j) {
+    for (const int & x : i)
+        ipasir_add(solver,-x);
+    for (const int & y : j)
+        ipasir_add(solver,-y);
+    ipasir_add(solver,0);
+    number_of_clauses++;
+}
+
 void notAll(void* solver, std::set<int> i){
 	for (const int & x : i)
 		ipasir_add(solver,-x);
@@ -167,7 +176,7 @@ void notAll(void* solver, std::set<int> i){
 	number_of_clauses++;
 }
 
-void atMostOneBinomial(void* solver, sat_capsule & capsule, std::vector<int> & is){
+void atMostOneBinomial(void* solver, std::vector<int> & is){
 	for (size_t i = 0; i < is.size(); i++){
 		int ii = is[i];
 		for (size_t j = i+1; j < is.size(); j++){
@@ -180,7 +189,7 @@ void atMostOne(void* solver, sat_capsule & capsule, std::vector<int> & is){
 	if (is.size() <= 1) return; // nothing to do
 
 	if (is.size() < 256){
-		atMostOneBinomial(solver,capsule,is);
+		atMostOneBinomial(solver,is);
 		return;
 	}
 
@@ -225,7 +234,7 @@ void atMostK(void* solver, sat_capsule & capsule, int K, std::vector<int> & is){
 		capsule.new_variable(); // id will not be needed
 
 
-	for (int i = 0; i < is.size(); i++){
+	for (size_t i = 0; i < is.size(); i++){
 		for (int j = 0; j <= K; j++){
 			ipasir_add(solver,-is[i]);
 			ipasir_add(solver,-(vars[i] + j));
@@ -244,7 +253,7 @@ void atMostK(void* solver, sat_capsule & capsule, int K, std::vector<int> & is){
 	ipasir_add(solver,0);
 }
 
-void atLeastOne(void* solver, sat_capsule & capsule, std::vector<int> & is){
+void atLeastOne(void* solver, std::vector<int> & is){
 	for (int & i : is)
 		ipasir_add(solver, i);
 	ipasir_add(solver,0);
