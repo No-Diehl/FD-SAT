@@ -367,8 +367,6 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
         invariants.push_back(group);
     }
 
-    cout << "Mutex formulas are:\n" << invariants << endl;
-
     // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@DEBUG@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     /*
     for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
@@ -412,6 +410,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     int operator_clauses = 0;
     int frame_axioms = 0;
     int operator_limit = 0;
+    int invariant_clauses = 0;
 
     for (int timeStep=0; timeStep<steps; timeStep++) {
         //cout << "TIMESTEP IS: " << timeStep << endl;
@@ -491,16 +490,17 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
 
         if (timeStep == 0) {
             operator_limit = get_number_of_clauses()-curr_clauses;
+            curr_clauses = get_number_of_clauses();
         }
-
+        // Add invariant clauses to solver.
         for (size_t i=0; i<invariants.size(); i++) {
             if (invariants.size()>0) {
                 for (size_t j=0; j<invariants[i].size(); j++) {
                     if (invariants[i][j].size()>0) {
                         for (size_t k=0; k<invariants[i][j].size(); k++) {
-                            if (i<invariants[i][j][k].var) {
+                            if (i<(size_t)invariants[i][j][k].var) {
                                 impliesNot(solver, factsAtTnow[i][j], factsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value]);
-                            } else if (i==invariants[i][j][k].var && j<invariants[i][j][k].value) {
+                            } else if (i==(size_t)invariants[i][j][k].var && j<(size_t)invariants[i][j][k].value) {
                                 impliesNot(solver, factsAtTnow[i][j], factsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value]);
                             }
                         }
@@ -508,9 +508,28 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
                 }
             }
         }
+        if (timeStep == 0) {
+            invariant_clauses = get_number_of_clauses()-curr_clauses;
+        }
 
         // At the end of one step prepare the next time step, if it isn't the last.
         if (timeStep == steps-1) {
+            // In the very last timestep don't forget to add invariants as well.
+            /*for (size_t i=0; i<invariants.size(); i++) {
+                if (invariants.size()>0) {
+                    for (size_t j=0; j<invariants[i].size(); j++) {
+                        if (invariants[i][j].size()>0) {
+                            for (size_t k=0; k<invariants[i][j].size(); k++) {
+                                if (i<(size_t)invariants[i][j][k].var) {
+                                    impliesNot(solver, factsAtTplusOne[i][j], factsAtTplusOne[invariants[i][j][k].var][invariants[i][j][k].value]);
+                                } else if (i==(size_t)invariants[i][j][k].var && j<(size_t)invariants[i][j][k].value) {
+                                    impliesNot(solver, factsAtTplusOne[i][j], factsAtTplusOne[invariants[i][j][k].var][invariants[i][j][k].value]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }*/
             break;
         } else {
             sat_step(task_proxy, capsule, factsAtTnow, factsAtTplusOne, operatorVars);
@@ -537,6 +556,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     cout << "[OperatorClauses=" << operator_clauses << "]" << endl;
     cout << "[FrameAxiomClauses=" << frame_axioms << "]" << endl;
     cout << "[OperatorLimitClauses=" << operator_limit << "]" << endl;
+    cout << "[InvariantClauses=" << invariant_clauses << "]" << endl;
     utils::Timer solution_timer;
     cout << ipasir_solve(solver) << endl;
     solution_timer.stop();
@@ -550,20 +570,6 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     if (ipasir_solve(solver) == 10){
         // Use plan_manager to save a found plan.
         found_plan(capsule.number_of_variables, task_proxy, solver, operatorVars, false);
-        /*
-        string validator = "validate";
-        string domain_file = "domain.pddl";
-        string problem_file = "problem-p01.pddl";
-        string plan_file = "found_plan";
-        string full_call = validator + " " + domain_file + " " + problem_file + " " + plan_file;
-        const char * cmd_call = full_call.c_str();
-        int val_return = system(cmd_call);
-        if (val_return == 0) {
-            return true;
-        } else {
-            cerr << "ERROR: Calling validator failed!" << endl;
-            return true;
-        }*/
     }
     // To make compiler shut up.
     return true;

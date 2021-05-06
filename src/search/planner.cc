@@ -52,6 +52,8 @@ int main(int argc, const char **argv) {
 
     // <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@>
     // End planner here for testing purposes.
+    utils::g_timer.stop();
+    utils::g_log << "Total time: " << utils::g_timer << endl;
     ExitCode exitcd = ExitCode::SUCCESS;
     utils::report_exit_code_reentrant(exitcd);
     return static_cast<int>(exitcd);
