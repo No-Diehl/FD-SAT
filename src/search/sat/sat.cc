@@ -9,40 +9,30 @@
 using namespace std;
 
 namespace sat {
-
-/* Using two 2D vectors to store the state variables (facts) for the current and
-   following time step.
-
-vector<vector<int>> factsAtTnow;
-vector<vector<int>> factsAtTplusOne;
-
- Using a 2D vector to store the operator variables for each time step.
-   Each vector represents the time step at which an operator was executed
-   (if true in the returned plan).
-
-vector<vector<int>> operatorVars;*/
-
-//void* solver = ipasir_init();
-
 /*
-Using two 4D vectors based on the 2D structure of the fact
- ectors to store results of the three parts of the chain search.
+  Using two 4D vectors based on the 2D structure of the fact
+  vectors to store results of the three parts of the chain search
+  (part of the forall-step encoding).
 */
 vector<vector<vector<vector<pair<int,int>>>>> chains;
 vector<vector<vector<vector<pair<int,int>>>>> chainsBackwards;
 
-// Storing the sizes of the require vectors.
+// Storing the sizes of the require vectors (forall-step encoding).
 vector<vector<int>> requireSizes;
 
-// Flag keeping track over sat_forall execution across multiple runs.
+// Storing invariants in this vector without duplicates.
+vector<vector<vector<FactPair>>> invariants;
+
+// Flag keeping track of sat_forall execution across multiple runs.
 bool satForallExecuted = false;
+// Flag keeping track of collect_invariants execution across multiple runs.
+bool satCollectInvariantsExecuted = false;
 
 void sat_init(TaskProxy task_proxy,
-    sat_capsule & capsule,
-    vector<vector<int>> & factsAtTnow,
-    vector<vector<int>> & factsAtTplusOne,
-    vector<vector<int>> & operatorVars) {
-
+              sat_capsule & capsule,
+              vector<vector<int>> & factsAtTnow,
+              vector<vector<int>> & factsAtTplusOne,
+              vector<vector<int>> & operatorVars) {
     // Initially fill the corresponding vectors with the variables representing
     // the initial state and the following time step.
     for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
@@ -64,12 +54,6 @@ void sat_init(TaskProxy task_proxy,
     }
     operatorVars.push_back(operatorsAtTnow);
 }
-
-/* Using two 3D vectors to store the state variables (facts) for the current and
-   following time step.
-
-vector<vector<vector<int>>> binaryFactsAtTnow;
-vector<vector<vector<int>>> binaryFactsAtTplusOne;*/
 
 void forbidden_binary_states(vector<vector<vector<int>>> & binaryFacts, void * solver) {
     for (size_t i=0; i<binaryFacts.size(); i++) {
@@ -96,11 +80,11 @@ void forbidden_binary_states(vector<vector<vector<int>>> & binaryFacts, void * s
 }
 
 void sat_init_binary(TaskProxy task_proxy,
-    sat_capsule & capsule,
-    void * solver,
-    vector<vector<vector<int>>> & binaryFactsAtTnow,
-    vector<vector<vector<int>>> & binaryFactsAtTplusOne,
-    vector<vector<int>> & operatorVars) {
+                     sat_capsule & capsule,
+                     void * solver,
+                     vector<vector<vector<int>>> & binaryFactsAtTnow,
+                     vector<vector<vector<int>>> & binaryFactsAtTplusOne,
+                     vector<vector<int>> & operatorVars) {
 
     for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
         vector<vector<int>> mutexGroupNow;
@@ -164,10 +148,10 @@ void sat_init_binary(TaskProxy task_proxy,
 }
 
 void sat_step(TaskProxy task_proxy,
-    sat_capsule & capsule,
-    vector<vector<int>> & factsAtTnow,
-    vector<vector<int>> & factsAtTplusOne,
-    vector<vector<int>> & operatorVars) {
+              sat_capsule & capsule,
+              vector<vector<int>> & factsAtTnow,
+              vector<vector<int>> & factsAtTplusOne,
+              vector<vector<int>> & operatorVars) {
 
     factsAtTnow.swap(factsAtTplusOne);
     // Replace all the variables in factsAtTplusOne with new variables for the current time step.
@@ -187,11 +171,11 @@ void sat_step(TaskProxy task_proxy,
 }
 
 void sat_step_binary(TaskProxy task_proxy,
-    sat_capsule & capsule,
-    void * solver,
-    vector<vector<vector<int>>> & binaryFactsAtTnow,
-    vector<vector<vector<int>>> & binaryFactsAtTplusOne,
-    vector<vector<int>> & operatorVars) {
+                     sat_capsule & capsule,
+                     void * solver,
+                     vector<vector<vector<int>>> & binaryFactsAtTnow,
+                     vector<vector<vector<int>>> & binaryFactsAtTplusOne,
+                     vector<vector<int>> & operatorVars) {
 
     binaryFactsAtTnow.swap(binaryFactsAtTplusOne);
     // Replace all the variables in binaryFactsAtTplusOne with new variables for the current time step.
@@ -228,7 +212,11 @@ void sat_step_binary(TaskProxy task_proxy,
     //cout << "Operator vars for next timestep: " << operatorVars << endl;
 }
 
-void found_plan(int vars, TaskProxy task_proxy, void * solver, const vector<vector<int>> & operatorVars, bool binary) {
+void found_plan(int vars,
+                TaskProxy task_proxy,
+                void * solver,
+                const vector<vector<int>> & operatorVars,
+                bool binary) {
     PlanManager plan_man;
     if (binary) {
         plan_man.set_plan_filename("found_plan_binary");
@@ -341,32 +329,6 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
 
     sat_init(task_proxy, capsule, factsAtTnow, factsAtTplusOne, operatorVars);
 
-
-    vector<vector<set<FactPair>>> mutexes = task_proxy.get_mutex_groups();
-    vector<vector<vector<FactPair>>> invariants;
-
-    for (size_t i=0; i<mutexes.size(); i++) {
-        vector<vector<FactPair>> group;
-        for (size_t j=0; j<mutexes[i].size(); j++) {
-            vector<FactPair> variable;
-            for (auto it = mutexes[i][j].begin(); it != mutexes[i][j].end(); it++) {
-                if (i<(size_t)it->var) {
-                    variable.push_back(*it);
-                    /*cout << "-" << task_proxy.get_variables()[i].get_fact(j).get_name()
-                         << " or -" << task_proxy.get_variables()[it->var].get_fact(it->value).get_name()
-                         << endl;*/
-                } else if (i==(size_t)it->var && j<(size_t)it->value) {
-                    variable.push_back(*it);
-                    /*out << "-" << task_proxy.get_variables()[i].get_fact(j).get_name()
-                         << " or -" << task_proxy.get_variables()[it->var].get_fact(it->value).get_name()
-                         << endl;*/
-                }
-            }
-            group.push_back(variable);
-        }
-        invariants.push_back(group);
-    }
-
     // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@DEBUG@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     /*
     for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
@@ -413,11 +375,17 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     int invariant_clauses = 0;
 
     for (int timeStep=0; timeStep<steps; timeStep++) {
-        //cout << "TIMESTEP IS: " << timeStep << endl;
-        // Testing forall encoding preparations.
+        // Forall-step rules only need to be generated once at the start,
+        // after that they just need to be encoded every solver run.
         if (timeStep == 0 && !satForallExecuted) {
             sat_forall(task_proxy);
             satForallExecuted = true;
+        }
+        // Invariants collection only needs to be run once at the beginning,
+        // after that they just need to be encoded every time step.
+        if (timeStep == 0 && !satCollectInvariantsExecuted) {
+            collect_invariants(task_proxy);
+            satCollectInvariantsExecuted = true;
         }
 
         int curr_clauses;
@@ -515,7 +483,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
         // At the end of one step prepare the next time step, if it isn't the last.
         if (timeStep == steps-1) {
             // In the very last timestep don't forget to add invariants as well.
-            /*for (size_t i=0; i<invariants.size(); i++) {
+            for (size_t i=0; i<invariants.size(); i++) {
                 if (invariants.size()>0) {
                     for (size_t j=0; j<invariants[i].size(); j++) {
                         if (invariants[i][j].size()>0) {
@@ -529,7 +497,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
                         }
                     }
                 }
-            }*/
+            }
             break;
         } else {
             sat_step(task_proxy, capsule, factsAtTnow, factsAtTplusOne, operatorVars);
@@ -986,6 +954,35 @@ void forall_chains(vector<vector<vector<int>>> & erase,
                 }
             }
         }
+    }
+
+}
+
+void collect_invariants(TaskProxy task_proxy) {
+    /*
+      Going through the mutex_groups in the SAS+ output file output.sas
+      These groups represent invariants of the translated problem and
+      can be used to speed up the solving process. FD already provides
+      some invariants after translating the problem and domain files,
+      but more can be obtained by running FD's output.sas through the
+      h2-FD-preprocessor of Vidal Alcázar and Álvaro Torralba
+      <torralba@cs.uni-saarland.de>.
+    */
+    vector<vector<set<FactPair>>> mutexes = task_proxy.get_mutex_groups();
+    for (size_t i=0; i<mutexes.size(); i++) {
+        vector<vector<FactPair>> group;
+        for (size_t j=0; j<mutexes[i].size(); j++) {
+            vector<FactPair> variable;
+            for (auto it = mutexes[i][j].begin(); it != mutexes[i][j].end(); it++) {
+                if (i<(size_t)it->var) {
+                    variable.push_back(*it);
+                } else if (i==(size_t)it->var && j<(size_t)it->value) {
+                    variable.push_back(*it);
+                }
+            }
+            group.push_back(variable);
+        }
+        invariants.push_back(group);
     }
 
 }

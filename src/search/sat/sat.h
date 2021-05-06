@@ -15,9 +15,8 @@ void sat_init(TaskProxy task_proxy,
               sat_capsule & capsule,
               vector<vector<int>> & factsAtTnow,
               vector<vector<int>> & factsAtTplusOne,
-              vector<vector<int>> & operatorVars,
-              vector<vector<vector<FactPair>>> & invariants);
-void forbidden_binary_states(vector<vector<vector<int>>> & bF);
+              vector<vector<int>> & operatorVars);
+void forbidden_binary_states(vector<vector<vector<int>>> & binaryFacts, void * solver);
 void sat_init_binary(TaskProxy task_proxy,
                      sat_capsule & capsule,
                      void * solver,
@@ -29,7 +28,12 @@ void sat_step(TaskProxy task_proxy,
               vector<vector<int>> & factsAtTnow,
               vector<vector<int>> & factsAtTplusOne,
               vector<vector<int>> & operatorVars);
-void sat_step_binary(TaskProxy task_proxy, sat_capsule & capsule);
+void sat_step_binary(TaskProxy task_proxy,
+                     sat_capsule & capsule,
+                     void * solver,
+                     vector<vector<vector<int>>> & binaryFactsAtTnow,
+                     vector<vector<vector<int>>> & binaryFactsAtTplusOne,
+                     vector<vector<int>> & operatorVars);
 void found_plan(int vars,
                 TaskProxy task_proxy,
                 void * solver,
@@ -45,5 +49,6 @@ void sat_forall(TaskProxy task_proxy);
 void forall_chains(vector<vector<vector<int>>> & erase,
                    vector<vector<vector<int>>> & require,
                    vector<vector<vector<vector<pair<int,int>>>>> & chainVec);
+void collect_invariants(TaskProxy task_proxy);
 }
 #endif
