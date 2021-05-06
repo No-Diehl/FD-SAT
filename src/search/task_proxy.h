@@ -678,6 +678,10 @@ public:
     State get_initial_state() const {
         return create_state(task->get_initial_state_values());
     }
+    // Using mutex groups in SAT encoding.
+    std::vector<std::vector<std::set<FactPair>>> get_mutex_groups() {
+        return task->mutex_groups();
+    }
 
     /*
       Convert a state from an ancestor task into a state of this task.

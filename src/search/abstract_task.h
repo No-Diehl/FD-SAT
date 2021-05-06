@@ -7,6 +7,7 @@
 #include "utils/hash.h"
 
 #include <memory>
+#include <set> // Needed for SAT encoding mutex groups.
 #include <string>
 #include <utility>
 #include <vector>
@@ -106,6 +107,10 @@ public:
     virtual void convert_state_values(
         std::vector<int> &values,
         const AbstractTask *ancestor_task) const = 0;
+    /*
+      Using mutex groups in SAT encoding.
+    */
+    virtual std::vector<std::vector<std::set<FactPair>>> mutex_groups() const = 0;
 };
 
 #endif

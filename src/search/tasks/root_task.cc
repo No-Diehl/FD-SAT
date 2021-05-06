@@ -103,6 +103,10 @@ public:
     virtual FactPair get_goal_fact(int index) const override;
 
     virtual vector<int> get_initial_state_values() const override;
+
+    // Using mutex groups in SAT encoding.
+    virtual std::vector<std::vector<std::set<FactPair>>> mutex_groups() const override;
+    
     virtual void convert_state_values(
         vector<int> &values,
         const AbstractTask *ancestor_task) const override;
@@ -484,6 +488,10 @@ FactPair RootTask::get_goal_fact(int index) const {
 
 vector<int> RootTask::get_initial_state_values() const {
     return initial_state_values;
+}
+// Using mutex groups in SAT encoding.
+std::vector<std::vector<std::set<FactPair>>> RootTask::mutex_groups() const {
+    return mutexes;
 }
 
 void RootTask::convert_state_values(

@@ -100,6 +100,11 @@ vector<int> DelegatingTask::get_initial_state_values() const {
     return parent->get_initial_state_values();
 }
 
+// Using mutex groups in SAT encoding.
+std::vector<std::vector<std::set<FactPair>>> DelegatingTask::mutex_groups() const {
+    return parent->mutex_groups();
+}
+
 void DelegatingTask::convert_state_values(
     vector<int> &values, const AbstractTask *ancestor_task) const {
     if (this == ancestor_task) {

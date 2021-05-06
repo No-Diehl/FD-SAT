@@ -341,6 +341,34 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
 
     sat_init(task_proxy, capsule, factsAtTnow, factsAtTplusOne, operatorVars);
 
+
+    vector<vector<set<FactPair>>> mutexes = task_proxy.get_mutex_groups();
+    vector<vector<vector<FactPair>>> invariants;
+
+    for (size_t i=0; i<mutexes.size(); i++) {
+        vector<vector<FactPair>> group;
+        for (size_t j=0; j<mutexes[i].size(); j++) {
+            vector<FactPair> variable;
+            for (auto it = mutexes[i][j].begin(); it != mutexes[i][j].end(); it++) {
+                if (i<(size_t)it->var) {
+                    variable.push_back(*it);
+                    /*cout << "-" << task_proxy.get_variables()[i].get_fact(j).get_name()
+                         << " or -" << task_proxy.get_variables()[it->var].get_fact(it->value).get_name()
+                         << endl;*/
+                } else if (i==(size_t)it->var && j<(size_t)it->value) {
+                    variable.push_back(*it);
+                    /*out << "-" << task_proxy.get_variables()[i].get_fact(j).get_name()
+                         << " or -" << task_proxy.get_variables()[it->var].get_fact(it->value).get_name()
+                         << endl;*/
+                }
+            }
+            group.push_back(variable);
+        }
+        invariants.push_back(group);
+    }
+
+    cout << "Mutex formulas are:\n" << invariants << endl;
+
     // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@DEBUG@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     /*
     for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
@@ -463,6 +491,22 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
 
         if (timeStep == 0) {
             operator_limit = get_number_of_clauses()-curr_clauses;
+        }
+
+        for (size_t i=0; i<invariants.size(); i++) {
+            if (invariants.size()>0) {
+                for (size_t j=0; j<invariants[i].size(); j++) {
+                    if (invariants[i][j].size()>0) {
+                        for (size_t k=0; k<invariants[i][j].size(); k++) {
+                            if (i<invariants[i][j][k].var) {
+                                impliesNot(solver, factsAtTnow[i][j], factsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value]);
+                            } else if (i==invariants[i][j][k].var && j<invariants[i][j][k].value) {
+                                impliesNot(solver, factsAtTnow[i][j], factsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value]);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // At the end of one step prepare the next time step, if it isn't the last.

@@ -56,6 +56,9 @@ public:
 
     virtual std::vector<int> get_initial_state_values() const override;
 
+    // Using mutex groups in SAT encoding.
+    virtual std::vector<std::vector<std::set<FactPair>>> mutex_groups() const override;
+
     virtual void convert_state_values(
         std::vector<int> &values,
         const AbstractTask *ancestor_task) const final override;

@@ -15,7 +15,8 @@ void sat_init(TaskProxy task_proxy,
               sat_capsule & capsule,
               vector<vector<int>> & factsAtTnow,
               vector<vector<int>> & factsAtTplusOne,
-              vector<vector<int>> & operatorVars);
+              vector<vector<int>> & operatorVars,
+              vector<vector<vector<FactPair>>> & invariants);
 void forbidden_binary_states(vector<vector<vector<int>>> & bF);
 void sat_init_binary(TaskProxy task_proxy,
                      sat_capsule & capsule,
@@ -23,7 +24,11 @@ void sat_init_binary(TaskProxy task_proxy,
                      vector<vector<vector<int>>> & binaryFactsAtTnow,
                      vector<vector<vector<int>>> & binaryFactsAtTplusOne,
                      vector<vector<int>> & operatorVars);
-void sat_step(TaskProxy task_proxy, sat_capsule & capsule);
+void sat_step(TaskProxy task_proxy,
+              sat_capsule & capsule,
+              vector<vector<int>> & factsAtTnow,
+              vector<vector<int>> & factsAtTplusOne,
+              vector<vector<int>> & operatorVars);
 void sat_step_binary(TaskProxy task_proxy, sat_capsule & capsule);
 void found_plan(int vars,
                 TaskProxy task_proxy,
