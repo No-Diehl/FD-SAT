@@ -18,11 +18,8 @@ using namespace std;
 using utils::ExitCode;
 
 int main(int argc, const char **argv) {
-    // sat::sat_solver_call();
-    // return(0);
+    // cout << ipasir_signature() << endl;
     utils::register_event_handlers();
-    cout << "Argument0 is: " << argv[0] << endl;
-    cout << "Argument1 is: " << argv[1] << endl;
 
     if (argc < 2) {
         utils::g_log << usage(argv[0]) << endl;
@@ -36,18 +33,13 @@ int main(int argc, const char **argv) {
         utils::g_log << "done reading input!" << endl;
         TaskProxy task_proxy(*tasks::g_root_task);
         unit_cost = task_properties::is_unit_cost(task_proxy);
-        // sat_capsule capsule;
-        // sat::sat_init(task_proxy, capsule);
-        // sat::sat_encoding(task_proxy, 32);
         bool plan_found = false;
         int round = 1;
         while (!plan_found) {
-            plan_found = sat::sat_encoding_binary(task_proxy, round);
-            round *= 2;
-        }
-        // sat::sat_encoding(task_proxy, 34);
-        // cout << ipasir_signature() << endl;
-         
+            plan_found = sat::sat_encoding(task_proxy, round);
+            // Trying to alternate even and odd rounds.
+            round += 15;
+        }         
     }
 
     // <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@> <@=*=@>
