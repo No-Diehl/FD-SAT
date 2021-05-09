@@ -38,7 +38,7 @@ int main(int argc, const char **argv) {
         while (!plan_found) {
             plan_found = sat::sat_encoding(task_proxy, round);
             // Trying to alternate even and odd rounds.
-            round += 15;
+            round *= 2;
         }         
     }
 

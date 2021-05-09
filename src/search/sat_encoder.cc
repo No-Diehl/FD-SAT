@@ -80,6 +80,7 @@ void assertYes(void* solver, int i){
 }
 
 void assertNot(void* solver, int i){
+    //std::cout << "Added " << -i << std::endl;
 	ipasir_add(solver,-i);
 	ipasir_add(solver,0);
 	number_of_clauses++;

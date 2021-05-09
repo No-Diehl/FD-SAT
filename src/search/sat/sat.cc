@@ -379,12 +379,14 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
         // after that they just need to be encoded every solver run.
         if (timeStep == 0 && !satForallExecuted) {
             sat_forall(task_proxy);
+            //cout << "Forall-step rules SUCCESSFULLY created." << endl;
             satForallExecuted = true;
         }
         // Invariants collection only needs to be run once at the beginning,
         // after that they just need to be encoded every time step.
         if (timeStep == 0 && !satCollectInvariantsExecuted) {
             collect_invariants(task_proxy);
+            //cout << "Invariants SUCCESSFULLY created." << endl;
             satCollectInvariantsExecuted = true;
         }
 
@@ -588,7 +590,7 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
         // Forall-step rules only need to be generated once at the start,
         // after that they just need to be encoded every solver run.
         if (timeStep == 0 && !satForallExecuted) {
-            sat_forall(task_proxy);
+            //sat_forall(task_proxy);
             satForallExecuted = true;
         }
         // Invariants collection only needs to be run once at the beginning,
@@ -698,8 +700,8 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
 
         // Add clauses such that exactly one operator can be picked per time step.
         atLeastOne(solver, operatorVars[timeStep]);
-        //atMostOne(solver, capsule, operatorVars[timeStep]);
-        forall_step_to_solver(capsule, solver, operatorVars, timeStep);
+        atMostOne(solver, capsule, operatorVars[timeStep]);
+        //forall_step_to_solver(capsule, solver, operatorVars, timeStep);
 
         if (timeStep == 0) {
             operator_limit = get_number_of_clauses()-curr_clauses;
@@ -881,6 +883,8 @@ void sat_forall(TaskProxy task_proxy) {
                     matchFound = true;
                     // Add operator to erase vector of this precondition.
                     eraseGroup[effVar][preconditions.get_pair().value].push_back(operatorVar);
+                    cout << "Added operator " << operators.get_id() << " to eraseGroup of ("
+                         << effVar << "=" << preconditions.get_pair().value << ")" << endl;
                     break;
                 }
             }
@@ -891,6 +895,8 @@ void sat_forall(TaskProxy task_proxy) {
                 for (size_t i=0; i<eraseGroup[effVar].size(); i++) {
                     if (i != (size_t)effects.get_fact().get_pair().value) {
                         eraseGroup[effVar][i].push_back(operatorVar);
+                        cout << "Added operator " << operators.get_id() << " to eraseGroup(s) of ("
+                             << effVar << "=" << i << ")" << endl;
                     }
                 }
             }
@@ -899,8 +905,15 @@ void sat_forall(TaskProxy task_proxy) {
         // of the corresponding preconditions.
         for (FactProxy const & preconditions : operators.get_preconditions()) {
             requireGroup[preconditions.get_pair().var][preconditions.get_pair().value].push_back(operatorVar);
+            cout << "Added operator " << operators.get_id() << " to requireGroup of ("
+                 << preconditions.get_pair().var << "=" << preconditions.get_pair().value << ")" << endl;
         }
     }
+
+    // @@@DEBUG@@@
+    cout << "eraseGroup:\n" << eraseGroup << endl;
+    cout << "reqireGroup:\n" << requireGroup << endl;
+    // @@@DEBUG@@@
 
     // Fill requireGroupSizes with the sizes of their respective vectors
     for (size_t i=0; i<requireGroup.size(); i++) {
