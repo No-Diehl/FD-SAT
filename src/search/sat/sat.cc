@@ -379,7 +379,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
         // after that they just need to be encoded every solver run.
         if (timeStep == 0 && !satForallExecuted) {
             sat_forall(task_proxy);
-            //cout << "Forall-step rules SUCCESSFULLY created." << endl;
+            cout << "Forall-step rules SUCCESSFULLY created." << endl;
             satForallExecuted = true;
         }
         // Invariants collection only needs to be run once at the beginning,
@@ -912,7 +912,7 @@ void sat_forall(TaskProxy task_proxy) {
 
     // @@@DEBUG@@@
     cout << "eraseGroup:\n" << eraseGroup << endl;
-    cout << "reqireGroup:\n" << requireGroup << endl;
+    cout << "requireGroup:\n" << requireGroup << endl;
     // @@@DEBUG@@@
 
     // Fill requireGroupSizes with the sizes of their respective vectors
@@ -929,6 +929,7 @@ void sat_forall(TaskProxy task_proxy) {
         }
     }
     requireSizes = requireGroupSizes;
+    cout << "requireSizes:\n" << requireSizes << endl;
     
     // Construct eraseGroupReversed from eraseGroup
     for (size_t i=0; i<eraseGroup.size(); i++) {
@@ -938,6 +939,7 @@ void sat_forall(TaskProxy task_proxy) {
             }
         }
     }
+    cout << "eraseGroupReversed:\n" << eraseGroupReversed << endl;
     // Construct requireGroupReversed from requireGroup
     for (size_t i=0; i<requireGroup.size(); i++) {
         for (size_t j=0; j<requireGroup[i].size(); j++) {
@@ -946,8 +948,11 @@ void sat_forall(TaskProxy task_proxy) {
             }
         }
     }
+    cout << "requireGroupReversed:\n" << requireGroupReversed << endl;
     forall_chains(eraseGroup, requireGroup, chains);
+    cout << "Forall_chains (regular direction) finished." << endl;
     forall_chains(eraseGroupReversed, requireGroupReversed, chainsBackwards);
+    cout << "Forall_chains (reversed) finished." << endl;
 
     /*
     Debugging Code
@@ -1015,7 +1020,7 @@ void forall_chains(vector<vector<vector<int>>> & erase,
                 continue;
             }
             for (size_t k=0; k<require[i][j].size()-1; k++) {
-                if (require[i][j][k]>erase[i][j][0]) {
+                if (erase[i][j].size()>0 && require[i][j][k]>erase[i][j][0]) {
                     // 2. Chain intersections
                     // Create rule a^i,m_t -> a^j,m_t. Variables represent their position (index)
                     // inside their require vector. Will be used for replacement with aux var.
@@ -1040,7 +1045,7 @@ void forall_chains(vector<vector<vector<int>>> & erase,
                 }
             }
             // End rule for last element of require vector, bc prior for loop ends one index early.
-            if (require[i][j][require[i][j].size()-1]>erase[i][j][0]) {
+            if (erase[i][j].size()>0 && require[i][j][require[i][j].size()-1]>erase[i][j][0]) {
                 if (require[i][j][require[i][j].size()-1]<0) {
                     // Correction for values from reversed vectors.
                     pair<int,int> chainEnd ((int)require[i][j].size()-1,-require[i][j][require[i][j].size()-1]);
