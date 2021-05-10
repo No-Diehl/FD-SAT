@@ -379,7 +379,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
         // after that they just need to be encoded every solver run.
         if (timeStep == 0 && !satForallExecuted) {
             sat_forall(task_proxy);
-            cout << "Forall-step rules SUCCESSFULLY created." << endl;
+            //cout << "Forall-step rules SUCCESSFULLY created." << endl;
             satForallExecuted = true;
         }
         // Invariants collection only needs to be run once at the beginning,
@@ -567,6 +567,34 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     sat_capsule capsule;
     sat_init_binary(task_proxy, capsule, solver, binaryFactsAtTnow, binaryFactsAtTplusOne, operatorVars);
 
+        // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@DEBUG@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    /*
+    for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
+        cout << "Variable group " << i << ": ";
+        for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
+            cout << task_proxy.get_variables()[i].get_fact(j).get_name() << "  ";
+        }
+        cout << endl;
+    }
+        
+    for (OperatorProxy const & operators : task_proxy.get_operators()) {
+        cout << "Operator " << operators.get_id() << " is called " << operators.get_name() << ": ";
+        for (FactProxy const & preconditions : operators.get_preconditions()) {
+            cout << preconditions.get_name() << " (" << preconditions.get_pair() << ") ";
+        }
+        cout << "--> ";
+        for (EffectProxy const & effects : operators.get_effects()) {
+            cout << effects.get_fact().get_name() << " (" << effects.get_fact().get_pair() << ") ";
+        }
+        cout << endl;
+    }
+
+    cout << "binaryFactsAtTnow: " << binaryFactsAtTnow << endl;
+    cout << "binaryFactsAtTplusOne: " << binaryFactsAtTplusOne << endl;
+    cout << "Operator Vars: " << operatorVars << endl;
+    */
+    // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@DEBUG@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
     // Add the binary variables reflecting the initial state of the problem.
     for (size_t i=0; i<binaryFactsAtTnow.size(); i++) {
         for (size_t j=0; j<binaryFactsAtTnow[i].size(); j++) {
@@ -699,7 +727,7 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
         }
 
         // Add clauses such that exactly one operator can be picked per time step.
-        atLeastOne(solver, operatorVars[timeStep]);
+        //atLeastOne(solver, operatorVars[timeStep]);
         //atMostOne(solver, capsule, operatorVars[timeStep]);
         forall_step_to_solver(capsule, solver, operatorVars, timeStep);
 
