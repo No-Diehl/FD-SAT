@@ -590,7 +590,7 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
         // Forall-step rules only need to be generated once at the start,
         // after that they just need to be encoded every solver run.
         if (timeStep == 0 && !satForallExecuted) {
-            //sat_forall(task_proxy);
+            sat_forall(task_proxy);
             satForallExecuted = true;
         }
         // Invariants collection only needs to be run once at the beginning,
@@ -700,8 +700,8 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
 
         // Add clauses such that exactly one operator can be picked per time step.
         atLeastOne(solver, operatorVars[timeStep]);
-        atMostOne(solver, capsule, operatorVars[timeStep]);
-        //forall_step_to_solver(capsule, solver, operatorVars, timeStep);
+        //atMostOne(solver, capsule, operatorVars[timeStep]);
+        forall_step_to_solver(capsule, solver, operatorVars, timeStep);
 
         if (timeStep == 0) {
             operator_limit = get_number_of_clauses()-curr_clauses;
@@ -883,8 +883,8 @@ void sat_forall(TaskProxy task_proxy) {
                     matchFound = true;
                     // Add operator to erase vector of this precondition.
                     eraseGroup[effVar][preconditions.get_pair().value].push_back(operatorVar);
-                    cout << "Added operator " << operators.get_id() << " to eraseGroup of ("
-                         << effVar << "=" << preconditions.get_pair().value << ")" << endl;
+                    //cout << "Added operator " << operators.get_id() << " to eraseGroup of ("
+                    //     << effVar << "=" << preconditions.get_pair().value << ")" << endl;
                     break;
                 }
             }
@@ -895,8 +895,8 @@ void sat_forall(TaskProxy task_proxy) {
                 for (size_t i=0; i<eraseGroup[effVar].size(); i++) {
                     if (i != (size_t)effects.get_fact().get_pair().value) {
                         eraseGroup[effVar][i].push_back(operatorVar);
-                        cout << "Added operator " << operators.get_id() << " to eraseGroup(s) of ("
-                             << effVar << "=" << i << ")" << endl;
+                        //cout << "Added operator " << operators.get_id() << " to eraseGroup(s) of ("
+                        //     << effVar << "=" << i << ")" << endl;
                     }
                 }
             }
@@ -905,15 +905,15 @@ void sat_forall(TaskProxy task_proxy) {
         // of the corresponding preconditions.
         for (FactProxy const & preconditions : operators.get_preconditions()) {
             requireGroup[preconditions.get_pair().var][preconditions.get_pair().value].push_back(operatorVar);
-            cout << "Added operator " << operators.get_id() << " to requireGroup of ("
-                 << preconditions.get_pair().var << "=" << preconditions.get_pair().value << ")" << endl;
+            //cout << "Added operator " << operators.get_id() << " to requireGroup of ("
+            //     << preconditions.get_pair().var << "=" << preconditions.get_pair().value << ")" << endl;
         }
     }
 
-    // @@@DEBUG@@@
+    /*// @@@DEBUG@@@
     cout << "eraseGroup:\n" << eraseGroup << endl;
     cout << "requireGroup:\n" << requireGroup << endl;
-    // @@@DEBUG@@@
+    // @@@DEBUG@@@*/
 
     // Fill requireGroupSizes with the sizes of their respective vectors
     for (size_t i=0; i<requireGroup.size(); i++) {
@@ -929,7 +929,7 @@ void sat_forall(TaskProxy task_proxy) {
         }
     }
     requireSizes = requireGroupSizes;
-    cout << "requireSizes:\n" << requireSizes << endl;
+    //cout << "requireSizes:\n" << requireSizes << endl;
     
     // Construct eraseGroupReversed from eraseGroup
     for (size_t i=0; i<eraseGroup.size(); i++) {
@@ -939,7 +939,7 @@ void sat_forall(TaskProxy task_proxy) {
             }
         }
     }
-    cout << "eraseGroupReversed:\n" << eraseGroupReversed << endl;
+    //cout << "eraseGroupReversed:\n" << eraseGroupReversed << endl;
     // Construct requireGroupReversed from requireGroup
     for (size_t i=0; i<requireGroup.size(); i++) {
         for (size_t j=0; j<requireGroup[i].size(); j++) {
@@ -948,11 +948,11 @@ void sat_forall(TaskProxy task_proxy) {
             }
         }
     }
-    cout << "requireGroupReversed:\n" << requireGroupReversed << endl;
+    //cout << "requireGroupReversed:\n" << requireGroupReversed << endl;
     forall_chains(eraseGroup, requireGroup, chains);
-    cout << "Forall_chains (regular direction) finished." << endl;
+    //cout << "Forall_chains (regular direction) finished." << endl;
     forall_chains(eraseGroupReversed, requireGroupReversed, chainsBackwards);
-    cout << "Forall_chains (reversed) finished." << endl;
+    //cout << "Forall_chains (reversed) finished." << endl;
 
     /*
     Debugging Code
