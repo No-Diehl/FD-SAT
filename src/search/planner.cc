@@ -36,9 +36,14 @@ int main(int argc, const char **argv) {
         bool plan_found = false;
         int round = 1;
         while (!plan_found) {
+            cout << "Encoding for max. " << round << " steps." << endl;
             plan_found = sat::sat_encoding(task_proxy, round);
-            // Trying to alternate even and odd rounds.
-            round *= 2;
+            // Trying a different iteration pattern.
+            if (round < 32) {round *= 2;}
+            else if (round < 364) {round = (int)(round*1.5);}
+            else if (round < 1385) {round = (int)(round*1.25);}
+            else if (round < 2805) {round = (int)(round*1.125);}
+            else {round = (int)(round*1.065);}
         }         
     }
 

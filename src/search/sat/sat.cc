@@ -451,7 +451,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
             curr_clauses = get_number_of_clauses();
         }
         // Add clauses such that exactly one operator can be picked per time step.
-        atLeastOne(solver, operatorVars[timeStep]);
+        //atLeastOne(solver, operatorVars[timeStep]);
         //atMostOne(solver, capsule, operatorVars[timeStep]);
         // Replace at-most-one condition with forall_step clauses.
         forall_step_to_solver(capsule, solver, operatorVars, timeStep);
