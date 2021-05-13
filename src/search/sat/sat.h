@@ -34,8 +34,7 @@ void sat_step_binary(TaskProxy task_proxy,
                      vector<vector<vector<int>>> & binaryFactsAtTnow,
                      vector<vector<vector<int>>> & binaryFactsAtTplusOne,
                      vector<vector<int>> & operatorVars);
-void found_plan(int vars,
-                TaskProxy task_proxy,
+void found_plan(TaskProxy task_proxy,
                 void * solver,
                 const vector<vector<int>> & operatorVars,
                 bool binary);
