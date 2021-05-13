@@ -33,11 +33,21 @@ int main(int argc, const char **argv) {
         utils::g_log << "done reading input!" << endl;
         TaskProxy task_proxy(*tasks::g_root_task);
         unit_cost = task_properties::is_unit_cost(task_proxy);
+        // Check, if there are conditional effects. If so, abort program.
+        for (OperatorProxy const & operators : task_proxy.get_operators()) {
+            for (EffectProxy const & effects : operators.get_effects()) {
+                if (!effects.get_conditions().empty()) {
+                    cout << "CONDITIONAL EFFECT FOUND! Conditional effects are not supported, "
+                         << "exiting program." << endl;
+                    utils::exit_with(ExitCode::SEARCH_INPUT_ERROR);
+                }
+            }
+        }
         bool plan_found = false;
         int round = 1;
         while (!plan_found) {
             cout << "Encoding for max. " << round << " steps." << endl;
-            plan_found = sat::sat_encoding(task_proxy, round);
+            plan_found = sat::sat_encoding_binary(task_proxy, round);
             // Trying a different iteration pattern.
             if (round < 32) {round *= 2;}
             else if (round < 364) {round = (int)(round*1.5);}

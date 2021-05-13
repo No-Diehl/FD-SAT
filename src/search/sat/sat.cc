@@ -212,8 +212,7 @@ void sat_step_binary(TaskProxy task_proxy,
     //cout << "Operator vars for next timestep: " << operatorVars << endl;
 }
 
-void found_plan(int vars,
-                TaskProxy task_proxy,
+void found_plan(TaskProxy task_proxy,
                 void * solver,
                 const vector<vector<int>> & operatorVars,
                 bool binary) {
@@ -224,12 +223,10 @@ void found_plan(int vars,
         plan_man.set_plan_filename("found_plan");
     }
     Plan plan;
-    for (int v = 1; v <= vars; v++) {
-        for (auto & it : operatorVars) {
-            for (size_t i=0; i<it.size(); i++) {
-                if (it[i] == v and ipasir_val(solver,v) > 0) {
-                    plan.push_back(OperatorID(task_proxy.get_operators()[i].get_id()));
-                }
+    for (auto & it : operatorVars) {
+        for (size_t i=0; i<it.size(); i++) {
+            if (ipasir_val(solver,it[i]) > 0) {
+                plan.push_back(OperatorID(task_proxy.get_operators()[i].get_id()));
             }
         }
     }
@@ -541,7 +538,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     }
     if (ipasir_solve(solver) == 10){
         // Use plan_manager to save a found plan.
-        found_plan(capsule.number_of_variables, task_proxy, solver, operatorVars, false);
+        found_plan(task_proxy, solver, operatorVars, false);
     }
     return true;
 }
@@ -848,7 +845,7 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     }
     if (ipasir_solve(solver) == 10){
         // Use plan_manager to save a found plan.
-        found_plan(capsule.number_of_variables, task_proxy, solver, operatorVars, true);
+        found_plan(task_proxy, solver, operatorVars, true);
     }
     return true;
 }
