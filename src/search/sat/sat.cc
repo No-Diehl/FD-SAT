@@ -244,6 +244,7 @@ void forall_step_to_solver(sat_capsule & capsule,
                 auxVars.push_back(capsule.new_variable());
             }
             //cout << "AuxVars: " << auxVars << endl;
+            //cout << "Forall-step rules:" << endl;
             for (size_t k=0; k<chains[i][j].size(); k++) {
                 if (k == 0) {
                     for (size_t l=0; l<chains[i][j][k].size(); l++) {
@@ -327,7 +328,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     sat_init(task_proxy, capsule, factsAtTnow, factsAtTplusOne, operatorVars);
 
     // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@DEBUG@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-    /*
+    
     for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
         cout << "Variable group " << i << ": ";
         for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
@@ -351,7 +352,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     cout << "FactsAtTnow: " << factsAtTnow << endl;
     cout << "FactsAtTplusOne: " << factsAtTplusOne << endl;
     cout << "Operator Vars: " << operatorVars << endl;
-    */
+    
     // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@DEBUG@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
     // Add the variables reflecting the initial state of the problem.
@@ -433,6 +434,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
             curr_clauses = get_number_of_clauses();
         }
         // Add frame axiom clauses.
+        cout << "Frame axiom clauses:" << endl;
         for (size_t i=0; i<frameAxioms.size(); i++) {
             for (size_t j=0; j<frameAxioms[i].size(); j++) {
                 int neg = factsAtTnow[i][j];
@@ -596,11 +598,14 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     for (size_t i=0; i<binaryFactsAtTnow.size(); i++) {
         for (size_t j=0; j<binaryFactsAtTnow[i].size(); j++) {
             if ((size_t)task_proxy.get_initial_state().get_values()[i] == j) {
+                //cout << "Init clause: ";
                 for (size_t k=0; k<binaryFactsAtTnow[i][j].size(); k++) {
                     // Since polarity of the variables is already embedded in their encoding
                     // they can be inserted as they are.
                     assertYes(solver, binaryFactsAtTnow[i][j][k]);
+                    //cout << binaryFactsAtTnow[i][j][k] << " ";
                 }
+                //cout << endl;
             }
         }
     }
@@ -632,6 +637,7 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
         // Add clauses reflecting the operators at the current time step.
         for (OperatorProxy const & operators : task_proxy.get_operators()) {
             int operatorVar = operatorVars[timeStep][operators.get_id()];
+            //cout << "Operator " << operators.get_name() << " clauses:" << endl;
             for (FactProxy const & preconditions : operators.get_preconditions()) {
                 for (size_t i=0; i<binaryFactsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value].size(); i++) {
                     implies(solver, operatorVar, binaryFactsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value][i]);
@@ -703,14 +709,15 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
             }
         }
         // Add all frame axiom clauses.
+        //cout << "Frame axiom clauses:" << endl;
         for (size_t i=0; i<frameAxioms.size(); i++) {
             for (size_t j=0; j<frameAxioms[i].size(); j++) {
-                if (j%2 == 0 && frameAxioms[i][j].size()>0) {
+                if (j%2 == 0 /*&& frameAxioms[i][j].size()>0*/) {
                     // upward flank
                     int neg = -binaryFactsAtTnow[i][0][j/2];
                     int pos = -binaryFactsAtTplusOne[i][0][j/2];
                     impliesPosAndNegImpliesOr(solver, pos, neg, frameAxioms[i][j]);
-                } else if (j%2 == 1 && frameAxioms[i][j].size()>0) {
+                } else if (j%2 == 1 /*&& frameAxioms[i][j].size()>0*/) {
                     // downward flank
                     int pos = -binaryFactsAtTnow[i][0][j/2];
                     int neg = -binaryFactsAtTplusOne[i][0][j/2];
@@ -733,6 +740,7 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
             curr_clauses = get_number_of_clauses();
         }
         // Add invariant clauses to solver.
+        //cout << "Invariant rules:" << endl;
         for (size_t i=0; i<invariants.size(); i++) {
             if (invariants.size()>0) {
                 for (size_t j=0; j<invariants[i].size(); j++) {
@@ -809,6 +817,7 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     }
     int curr_clauses = get_number_of_clauses();
     // Add the variables reflecting the goal state of the problem after the last time step.
+    //cout << "Goal clauses:" << endl;
     for (size_t i=0; i<task_proxy.get_goals().size(); i++) {
         for (size_t j=0; j<binaryFactsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value].size(); j++) {
             assertYes(solver, binaryFactsAtTplusOne[task_proxy.get_goals()[i].get_pair().var][task_proxy.get_goals()[i].get_pair().value][j]);
