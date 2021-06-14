@@ -305,7 +305,7 @@ void forall_step_to_solver(sat_capsule & capsule,
     }
 }
 
-bool sat_encoding(TaskProxy task_proxy, int steps) {
+bool sat_encoding(TaskProxy task_proxy, int steps, bool inv_opt, bool forall_opt) {
     // Start encoding timer here.
     utils::Timer enc_timer;
 
@@ -328,7 +328,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     sat_init(task_proxy, capsule, factsAtTnow, factsAtTplusOne, operatorVars);
 
     // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@DEBUG@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-    
+    /*
     for (size_t i=0; i<task_proxy.get_variables().size(); i++) {
         cout << "Variable group " << i << ": ";
         for (int j=0; j<task_proxy.get_variables()[i].get_domain_size(); j++) {
@@ -352,7 +352,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     cout << "FactsAtTnow: " << factsAtTnow << endl;
     cout << "FactsAtTplusOne: " << factsAtTplusOne << endl;
     cout << "Operator Vars: " << operatorVars << endl;
-    
+    */
     // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@DEBUG@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
     // Add the variables reflecting the initial state of the problem.
@@ -375,14 +375,14 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     for (int timeStep=0; timeStep<steps; timeStep++) {
         // Forall-step rules only need to be generated once at the start,
         // after that they just need to be encoded every solver run.
-        if (timeStep == 0 && !satForallExecuted) {
+        if (timeStep == 0 && !satForallExecuted && forall_opt) {
             sat_forall(task_proxy);
             //cout << "Forall-step rules SUCCESSFULLY created." << endl;
             satForallExecuted = true;
         }
         // Invariants collection only needs to be run once at the beginning,
         // after that they just need to be encoded every time step.
-        if (timeStep == 0 && !satCollectInvariantsExecuted) {
+        if (timeStep == 0 && !satCollectInvariantsExecuted && inv_opt) {
             collect_invariants(task_proxy);
             //cout << "Invariants SUCCESSFULLY created." << endl;
             satCollectInvariantsExecuted = true;
@@ -434,7 +434,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
             curr_clauses = get_number_of_clauses();
         }
         // Add frame axiom clauses.
-        cout << "Frame axiom clauses:" << endl;
+        //cout << "Frame axiom clauses:" << endl;
         for (size_t i=0; i<frameAxioms.size(); i++) {
             for (size_t j=0; j<frameAxioms[i].size(); j++) {
                 int neg = factsAtTnow[i][j];
@@ -451,32 +451,39 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
         }
         // Add clauses such that exactly one operator can be picked per time step.
         //atLeastOne(solver, operatorVars[timeStep]);
-        //atMostOne(solver, capsule, operatorVars[timeStep]);
+        if (!forall_opt) {
+            atMostOne(solver, capsule, operatorVars[timeStep]);
+        }
         // Replace at-most-one condition with forall_step clauses.
-        forall_step_to_solver(capsule, solver, operatorVars, timeStep);
-
+        if (forall_opt) {
+            forall_step_to_solver(capsule, solver, operatorVars, timeStep);
+        }
         if (timeStep == 0) {
             operator_limit = get_number_of_clauses()-curr_clauses;
             curr_clauses = get_number_of_clauses();
         }
-        // Add invariant clauses to solver.
-        for (size_t i=0; i<invariants.size(); i++) {
-            if (invariants.size()>0) {
-                for (size_t j=0; j<invariants[i].size(); j++) {
-                    if (invariants[i][j].size()>0) {
-                        for (size_t k=0; k<invariants[i][j].size(); k++) {
-                            if (i<(size_t)invariants[i][j][k].var) {
-                                impliesNot(solver, factsAtTnow[i][j], factsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value]);
-                            } else if (i==(size_t)invariants[i][j][k].var && j<(size_t)invariants[i][j][k].value) {
-                                impliesNot(solver, factsAtTnow[i][j], factsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value]);
+
+        if (inv_opt) {
+            // Add invariant clauses to solver.
+            for (size_t i=0; i<invariants.size(); i++) {
+                if (invariants.size()>0) {
+                    for (size_t j=0; j<invariants[i].size(); j++) {
+                        if (invariants[i][j].size()>0) {
+                            for (size_t k=0; k<invariants[i][j].size(); k++) {
+                                if (i<(size_t)invariants[i][j][k].var) {
+                                    impliesNot(solver, factsAtTnow[i][j], factsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value]);
+                                } else if (i==(size_t)invariants[i][j][k].var && j<(size_t)invariants[i][j][k].value) {
+                                    impliesNot(solver, factsAtTnow[i][j], factsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value]);
+                                }
                             }
                         }
                     }
                 }
             }
-        }
-        if (timeStep == 0) {
-            invariant_clauses = get_number_of_clauses()-curr_clauses;
+        
+            if (timeStep == 0) {
+                invariant_clauses = get_number_of_clauses()-curr_clauses;
+            }
         }
 
         // At the end of one step prepare the next time step, if it isn't the last.
@@ -522,8 +529,12 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     cout << "[MutexClauses=" << mutex_clauses << "]" << endl;
     cout << "[OperatorClauses=" << operator_clauses << "]" << endl;
     cout << "[FrameAxiomClauses=" << frame_axioms << "]" << endl;
-    cout << "[OperatorLimitClauses=" << operator_limit << "]" << endl;
-    cout << "[InvariantClauses=" << invariant_clauses << "]" << endl;
+    if (forall_opt) {
+        cout << "[OperatorLimitClauses=" << operator_limit << "]" << endl;
+    }
+    if (inv_opt) {
+        cout << "[InvariantClauses=" << invariant_clauses << "]" << endl;
+    }
     utils::Timer solution_timer;
     cout << ipasir_solve(solver);
     if (ipasir_solve(solver) == 20) {
@@ -545,7 +556,7 @@ bool sat_encoding(TaskProxy task_proxy, int steps) {
     return true;
 }
 
-bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
+bool sat_encoding_binary(TaskProxy task_proxy, int steps, bool inv_opt, bool forall_opt) {
     // Start encoding timer here.
     utils::Timer enc_timer;
 
@@ -619,13 +630,13 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     for (int timeStep=0; timeStep<steps; timeStep++) {
         // Forall-step rules only need to be generated once at the start,
         // after that they just need to be encoded every solver run.
-        if (timeStep == 0 && !satForallExecuted) {
+        if (timeStep == 0 && !satForallExecuted && forall_opt) {
             sat_forall(task_proxy);
             satForallExecuted = true;
         }
         // Invariants collection only needs to be run once at the beginning,
         // after that they just need to be encoded every time step.
-        if (timeStep == 0 && !satCollectInvariantsExecuted) {
+        if (timeStep == 0 && !satCollectInvariantsExecuted && inv_opt) {
             collect_invariants(task_proxy);
             satCollectInvariantsExecuted = true;
         }
@@ -732,48 +743,55 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
 
         // Add clauses such that exactly one operator can be picked per time step.
         //atLeastOne(solver, operatorVars[timeStep]);
-        //atMostOne(solver, capsule, operatorVars[timeStep]);
-        forall_step_to_solver(capsule, solver, operatorVars, timeStep);
+        if (!forall_opt) {
+            atMostOne(solver, capsule, operatorVars[timeStep]);
+        }
+        if (forall_opt) {
+            forall_step_to_solver(capsule, solver, operatorVars, timeStep);
+        }
 
         if (timeStep == 0) {
             operator_limit = get_number_of_clauses()-curr_clauses;
             curr_clauses = get_number_of_clauses();
         }
+
         // Add invariant clauses to solver.
-        //cout << "Invariant rules:" << endl;
-        for (size_t i=0; i<invariants.size(); i++) {
-            if (invariants.size()>0) {
-                for (size_t j=0; j<invariants[i].size(); j++) {
-                    if (invariants[i][j].size()>0) {
-                        for (size_t k=0; k<invariants[i][j].size(); k++) {
-                            if (i<(size_t)invariants[i][j][k].var) {
-                                vector<int> left;
-                                vector<int> right;
-                                for (size_t l=0; l<binaryFactsAtTnow[i][j].size(); l++) {
-                                    left.push_back(binaryFactsAtTnow[i][j][l]);
+        if (inv_opt) {
+            //cout << "Invariant rules:" << endl;
+            for (size_t i=0; i<invariants.size(); i++) {
+                if (invariants.size()>0) {
+                    for (size_t j=0; j<invariants[i].size(); j++) {
+                        if (invariants[i][j].size()>0) {
+                            for (size_t k=0; k<invariants[i][j].size(); k++) {
+                                if (i<(size_t)invariants[i][j][k].var) {
+                                    vector<int> left;
+                                    vector<int> right;
+                                    for (size_t l=0; l<binaryFactsAtTnow[i][j].size(); l++) {
+                                        left.push_back(binaryFactsAtTnow[i][j][l]);
+                                    }
+                                    for (size_t r=0; r<binaryFactsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value].size(); r++) {
+                                        right.push_back(binaryFactsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value][r]);
+                                    }
+                                    andImpliesAllNot(solver, right, left);
+                                } else if (i==(size_t)invariants[i][j][k].var && j<(size_t)invariants[i][j][k].value) {
+                                    vector<int> left;
+                                    vector<int> right;
+                                    for (size_t l=0; l<binaryFactsAtTnow[i][j].size(); l++) {
+                                        left.push_back(binaryFactsAtTnow[i][j][l]);
+                                    }
+                                    for (size_t r=0; r<binaryFactsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value].size(); r++) {
+                                        right.push_back(binaryFactsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value][r]);
+                                    }
+                                    andImpliesAllNot(solver, right, left);
                                 }
-                                for (size_t r=0; r<binaryFactsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value].size(); r++) {
-                                    right.push_back(binaryFactsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value][r]);
-                                }
-                                andImpliesAllNot(solver, right, left);
-                            } else if (i==(size_t)invariants[i][j][k].var && j<(size_t)invariants[i][j][k].value) {
-                                vector<int> left;
-                                vector<int> right;
-                                for (size_t l=0; l<binaryFactsAtTnow[i][j].size(); l++) {
-                                    left.push_back(binaryFactsAtTnow[i][j][l]);
-                                }
-                                for (size_t r=0; r<binaryFactsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value].size(); r++) {
-                                    right.push_back(binaryFactsAtTnow[invariants[i][j][k].var][invariants[i][j][k].value][r]);
-                                }
-                                andImpliesAllNot(solver, right, left);
                             }
                         }
                     }
                 }
             }
-        }
-        if (timeStep == 0) {
-            invariant_clauses = get_number_of_clauses()-curr_clauses;
+            if (timeStep == 0) {
+                invariant_clauses = get_number_of_clauses()-curr_clauses;
+            }
         }
 
         // At the end of one step prepare the next time step, if it isn't the last.
@@ -836,8 +854,12 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps) {
     cout << "Per time step the following clauses have been added" << endl;
     cout << "[OperatorClauses=" << operator_clauses << "]" << endl;
     cout << "[FrameAxiomClauses=" << frame_axioms << "]" << endl;
-    cout << "[OperatorLimitClauses=" << operator_limit << "]" << endl;
-    cout << "[InvariantClauses=" << invariant_clauses << "]" << endl;
+    if (forall_opt) {
+        cout << "[OperatorLimitClauses=" << operator_limit << "]" << endl;
+    }
+    if (inv_opt) {
+        cout << "[InvariantClauses=" << invariant_clauses << "]" << endl;
+    }
     utils::Timer solution_timer;
     cout << ipasir_solve(solver);
     if (ipasir_solve(solver) == 20) {

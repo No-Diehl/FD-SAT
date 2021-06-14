@@ -42,8 +42,8 @@ void forall_step_to_solver(sat_capsule & capsule,
                            void * solver,
                            const vector<vector<int>> & operatorVars,
                            int timeStep);
-bool sat_encoding(TaskProxy task_proxy, int steps);
-bool sat_encoding_binary(TaskProxy task_proxy, int steps);
+bool sat_encoding(TaskProxy task_proxy, int steps, bool inv_opt, bool forall_opt);
+bool sat_encoding_binary(TaskProxy task_proxy, int steps, bool inv_opt, bool forall_opt);
 void sat_forall(TaskProxy task_proxy);
 void forall_chains(vector<vector<vector<int>>> & erase,
                    vector<vector<vector<int>>> & require,
