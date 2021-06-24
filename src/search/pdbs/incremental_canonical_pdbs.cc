@@ -2,6 +2,7 @@
 
 #include "canonical_pdbs.h"
 #include "pattern_database.h"
+#include <limits>
 
 using namespace std;
 
