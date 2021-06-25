@@ -547,11 +547,13 @@ bool sat_encoding(TaskProxy task_proxy, int steps, bool inv_opt, bool forall_opt
 
     // If no plan is found exit the function by returning false and trigger next iteration.
     if (ipasir_solve(solver) == 20) {
+        ipasir_release(solver);
         return false;
     }
     if (ipasir_solve(solver) == 10){
         // Use plan_manager to save a found plan.
         found_plan(task_proxy, solver, operatorVars, false);
+        ipasir_release(solver);
     }
     return true;
 }
@@ -872,11 +874,13 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps, bool inv_opt, bool for
 
     // If no plan is found exit the function by returning false and trigger next iteration.
     if (ipasir_solve(solver) == 20) {
+        ipasir_release(solver);
         return false;
     }
     if (ipasir_solve(solver) == 10){
         // Use plan_manager to save a found plan.
         found_plan(task_proxy, solver, operatorVars, true);
+        ipasir_release(solver);
     }
     return true;
 }
