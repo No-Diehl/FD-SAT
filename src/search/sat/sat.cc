@@ -349,6 +349,24 @@ bool sat_encoding(TaskProxy task_proxy, int steps, bool inv_opt, bool forall_opt
         cout << endl;
     }
 
+    for (OperatorProxy const & axioms : task_proxy.get_axioms()) {
+        cout << "Axiom " << axioms.get_id() << " is called " << axioms.get_name() << ": ";
+        for (FactProxy const & preconditions : axioms.get_preconditions()) {
+            cout << preconditions.get_name() << " (" << preconditions.get_pair() << ") ";
+        }
+        cout << "--> ";
+        for (EffectProxy const & effects : axioms.get_effects()) {
+            if (!effects.get_conditions().empty()) {
+                for (FactProxy effcond : effects.get_conditions()) {
+                    cout << "(" << effcond.get_name() << " (" << effcond.get_pair() << "), "  << endl;
+                }
+                cout << ") --> " << endl;
+            }
+            cout << effects.get_fact().get_name() << " (" << effects.get_fact().get_pair() << ") ";
+        }
+        cout << endl;
+    }
+
     cout << "FactsAtTnow: " << factsAtTnow << endl;
     cout << "FactsAtTplusOne: " << factsAtTplusOne << endl;
     cout << "Operator Vars: " << operatorVars << endl;
@@ -426,6 +444,29 @@ bool sat_encoding(TaskProxy task_proxy, int steps, bool inv_opt, bool forall_opt
                 frameAxioms[effects.get_fact().get_pair().var][effects.get_fact().get_value()].push_back(operatorVars[timeStep][operators.get_id()]);
             }
         }
+
+        // NEW PART: Add axioms to each current time step to ensure that everything works.
+        vector<int> axiomPreconditions;
+        vector<int> axiomEffects;
+        for (OperatorProxy const & axioms : task_proxy.get_axioms()) {
+            for (FactProxy const & preconditions : axioms.get_preconditions()) {
+                axiomPreconditions.push_back(factsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value]);
+            }
+            for (EffectProxy const & effects : axioms.get_effects()) {
+                axiomEffects.push_back(factsAtTnow[effects.get_fact().get_pair().var][effects.get_fact().get_pair().value]);
+                if (!effects.get_conditions().empty()) {
+                    for (FactProxy effprecond : effects.get_conditions()) {
+                        axiomPreconditions.push_back(factsAtTnow[effprecond.get_pair().var][effprecond.get_value()]);
+                    }
+                }                  
+            }
+            for (size_t i=0; i<axiomEffects.size(); i++) {
+                andImplies(solver, axiomPreconditions, axiomEffects[i]);
+            }
+            axiomPreconditions.clear();
+            axiomEffects.clear();
+        }
+
         if (timeStep == 0) {
             operator_clauses = get_number_of_clauses()-curr_clauses;
         }
@@ -503,6 +544,27 @@ bool sat_encoding(TaskProxy task_proxy, int steps, bool inv_opt, bool forall_opt
                         }
                     }
                 }
+            }
+            // NEW PART: Add axioms in very last timestep as well.
+            vector<int> axiomPreconditions;
+            vector<int> axiomEffects;
+            for (OperatorProxy const & axioms : task_proxy.get_axioms()) {
+                for (FactProxy const & preconditions : axioms.get_preconditions()) {
+                    axiomPreconditions.push_back(factsAtTplusOne[preconditions.get_pair().var][preconditions.get_pair().value]);
+                }
+                for (EffectProxy const & effects : axioms.get_effects()) {
+                    axiomEffects.push_back(factsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_pair().value]);
+                    if (!effects.get_conditions().empty()) {
+                        for (FactProxy effprecond : effects.get_conditions()) {
+                            axiomPreconditions.push_back(factsAtTplusOne[effprecond.get_pair().var][effprecond.get_value()]);
+                        }
+                    }                  
+                }
+                for (size_t i=0; i<axiomEffects.size(); i++) {
+                    andImplies(solver, axiomPreconditions, axiomEffects[i]);
+                }
+                axiomPreconditions.clear();
+                axiomEffects.clear();
             }
             break;
         } else {
@@ -664,6 +726,34 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps, bool inv_opt, bool for
                 }
             }
         }
+        // NEW PART: Add axioms to each current time step to ensure that everything works.
+        vector<int> axiomPreconditions;
+        vector<int> axiomEffects;
+        for (OperatorProxy const & axioms : task_proxy.get_axioms()) {
+            for (FactProxy const & preconditions : axioms.get_preconditions()) {
+                for (size_t i=0; i<binaryFactsAtTnow[preconditions.get_pair().var][preconditions.get_value()].size(); i++) {
+                    axiomPreconditions.push_back(binaryFactsAtTnow[preconditions.get_pair().var][preconditions.get_pair().value][i]);
+                }
+            }
+            for (EffectProxy const & effects : axioms.get_effects()) {
+                for (size_t i=0; i<binaryFactsAtTnow[effects.get_fact().get_pair().var][effects.get_fact().get_value()].size(); i++) {
+                    axiomEffects.push_back(binaryFactsAtTnow[effects.get_fact().get_pair().var][effects.get_fact().get_value()][i]);
+                }
+                if (!effects.get_conditions().empty()) {
+                    for (FactProxy effprecond : effects.get_conditions()) {
+                        for (size_t j=0; j<binaryFactsAtTnow[effprecond.get_pair().var][effprecond.get_value()].size(); j++) {
+                            axiomPreconditions.push_back(binaryFactsAtTnow[effprecond.get_pair().var][effprecond.get_value()][j]);
+                        }
+                    }
+                }                  
+            }
+            for (size_t i=0; i<axiomEffects.size(); i++) {
+                andImplies(solver, axiomPreconditions, axiomEffects[i]);
+            }
+            axiomPreconditions.clear();
+            axiomEffects.clear();
+        }
+
         if (timeStep == 0) {
             operator_clauses = get_number_of_clauses()-curr_clauses;
             curr_clauses = get_number_of_clauses();
@@ -831,6 +921,33 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps, bool inv_opt, bool for
                         }
                     }
                 }
+            }
+            // NEW PART: Add axioms in the very last step as well.
+            vector<int> axiomPreconditions;
+            vector<int> axiomEffects;
+            for (OperatorProxy const & axioms : task_proxy.get_axioms()) {
+                for (FactProxy const & preconditions : axioms.get_preconditions()) {
+                    for (size_t i=0; i<binaryFactsAtTplusOne[preconditions.get_pair().var][preconditions.get_value()].size(); i++) {
+                        axiomPreconditions.push_back(binaryFactsAtTplusOne[preconditions.get_pair().var][preconditions.get_pair().value][i]);
+                    }
+                }
+                for (EffectProxy const & effects : axioms.get_effects()) {
+                    for (size_t i=0; i<binaryFactsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_value()].size(); i++) {
+                        axiomEffects.push_back(binaryFactsAtTplusOne[effects.get_fact().get_pair().var][effects.get_fact().get_value()][i]);
+                    }
+                    if (!effects.get_conditions().empty()) {
+                        for (FactProxy effprecond : effects.get_conditions()) {
+                            for (size_t j=0; j<binaryFactsAtTplusOne[effprecond.get_pair().var][effprecond.get_value()].size(); j++) {
+                                axiomPreconditions.push_back(binaryFactsAtTplusOne[effprecond.get_pair().var][effprecond.get_value()][j]);
+                            }
+                        }
+                    }                  
+                }
+                for (size_t i=0; i<axiomEffects.size(); i++) {
+                    andImplies(solver, axiomPreconditions, axiomEffects[i]);
+                }
+                axiomPreconditions.clear();
+                axiomEffects.clear();
             }
             break;
         } else {
