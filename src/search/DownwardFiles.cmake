@@ -57,6 +57,7 @@ fast_downward_plugin(
         evaluator_cache
         global_state
         heuristic
+		ipasir_kissat_adapter
         open_list
         open_list_factory
         operator_cost

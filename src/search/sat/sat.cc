@@ -598,22 +598,23 @@ bool sat_encoding(TaskProxy task_proxy, int steps, bool inv_opt, bool forall_opt
         cout << "[InvariantClauses=" << invariant_clauses << "]" << endl;
     }
     utils::Timer solution_timer;
-    cout << ipasir_solve(solver);
-    if (ipasir_solve(solver) == 20) {
+    int solveState = ipasir_solve(solver);
+	cout << solveState;
+    if (solveState == 20) {
         cout << ": NO solution found!" << endl;
-    } else if (ipasir_solve(solver) == 10) {
+    } else if (solveState == 10) {
         cout << ": SOLUTION FOUND!" << endl;
     }
     solution_timer.stop();
     cout << "[solvingTime=" << solution_timer << "]" << endl;
 
     // If no plan is found exit the function by returning false and trigger next iteration.
-    if (ipasir_solve(solver) == 20) {
+    if (solveState == 20) {
 		// release solver to free memory allocated by solver
 		ipasir_release(solver);
 		return false;
     }
-    if (ipasir_solve(solver) == 10){
+    if (solveState == 10){
         // Use plan_manager to save a found plan.
         found_plan(task_proxy, solver, operatorVars, false);
 		// release solver to free memory allocated by solver
@@ -982,21 +983,22 @@ bool sat_encoding_binary(TaskProxy task_proxy, int steps, bool inv_opt, bool for
         cout << "[InvariantClauses=" << invariant_clauses << "]" << endl;
     }
     utils::Timer solution_timer;
-    cout << ipasir_solve(solver);
-    if (ipasir_solve(solver) == 20) {
+    int solveState = ipasir_solve(solver);
+	cout << solveState;
+    if (solveState == 20) {
         cout << ": NO solution found!" << endl;
-    } else if (ipasir_solve(solver) == 10) {
+    } else if (solveState == 10) {
         cout << ": SOLUTION FOUND!" << endl;
     }
     solution_timer.stop();
     cout << "[solvingTime=" << solution_timer << "]" << endl;
 
     // If no plan is found exit the function by returning false and trigger next iteration.
-    if (ipasir_solve(solver) == 20) {
+    if (solveState == 20) {
         ipasir_release(solver);
         return false;
     }
-    if (ipasir_solve(solver) == 10){
+    if (solveState == 10){
         // Use plan_manager to save a found plan.
         found_plan(task_proxy, solver, operatorVars, true);
         ipasir_release(solver);
