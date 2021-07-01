@@ -280,5 +280,5 @@ int main(int argc, const char **argv) {
     }
     cout << "done" << endl;
     utils::g_timer.stop();
-    cout << "Total time: " << utils::g_timer << endl;
+    cout << "H2 time: " << utils::g_timer << endl;
 }
