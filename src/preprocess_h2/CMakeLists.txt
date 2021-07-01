@@ -22,6 +22,10 @@ set(PREPROCESS_SOURCES
     operator.cc
     scc.cc
     state.cc
+    system.cc
+    system_unix.cc
+    system_windows.cc
+    timer.cc
     successor_generator.cc
     variable.cc
 )

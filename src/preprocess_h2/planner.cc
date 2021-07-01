@@ -16,6 +16,7 @@
 #include "axiom.h"
 #include "h2_mutexes.h"
 #include "variable.h"
+#include "timer.h"
 #include <iostream>
 using namespace std;
 
@@ -278,4 +279,6 @@ int main(int argc, const char **argv) {
             transition_graphs, causal_graph);
     }
     cout << "done" << endl;
+    utils::g_timer.stop();
+    cout << "Total time: " << utils::g_timer << endl;
 }
